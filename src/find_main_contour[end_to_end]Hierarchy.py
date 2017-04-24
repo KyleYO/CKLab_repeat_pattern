@@ -97,19 +97,13 @@ def main():
        
   
         
-        #for i in xrange(height):
-            #for k in xrange(width):
-                #hsv[i,k] = (hsv[i][k][0],hsv[i][k][1],255)
-                
-        #hsv = cv2.cvtColor( hsv, cv2.COLOR_HSV2BGR)
-        
+       
         ratio = 0.4
         ratio = 280/ float( image_ori.shape[0] )
         
         combine_imagergb = np.concatenate((_r, _g), axis=1)  
         combine_imagergb = np.concatenate((combine_imagergb, _b), axis=1)
-        #cv2.imshow('img_rgb_split',cv2.resize(combine_imagergb,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.waitKey(0)        
+            
         
         combine_image = np.concatenate((image,  hsv), axis=1)  
         combine_imagehsv = np.concatenate((h, s), axis=1)  
