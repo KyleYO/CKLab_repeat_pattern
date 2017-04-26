@@ -14,24 +14,6 @@ from scipy.cluster.hierarchy import fcluster
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 
-#import dbclasd
-
-resize_height = 736.0
-split_n_row = 16
-split_n_column = 16
-
-_local = True
-_equalization = False
-_sharpen = True
-_check_overlap = False
-
-#input_path = '../../first_state_data/'
-input_path = '../../input_image/'
-#input_path = './input_3para-1/'
-#input_path = './input/'
-output_path = './output_hierarchy/'
-#output_path = './output-Order-varyStd/'
-
 GREEN = (0,255,0)
 BLUE = (255,0,0)
 RED = (0,0,255)
@@ -43,15 +25,27 @@ WHITE = (255,255,255)
 BLACK = (0,0,0)
 switchColor = [(255,255,0),(255,0,255),(0,255,255),(255,0,0),(0,255,0),(255,128,0),(255,0,128),(128,0,255),(128,255,0),(0,128,255),(0,255,128)]
 
-resize_ratio = 0.6
+
+resize_height = 736.0
+split_n_row = 16
+split_n_column = 16
+
+_sharpen = True
+_check_overlap = False
+
+input_path = '../../input_image/'
+output_path = '../test/combine/output_hierarchy/'
+
+_edge_by_channel = ['v','l']
+_showImg = { 'original':True, 'edge':True, 'contour':True, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'result_contour':True, 'result_max':True }
+_writeImg = { 'original':False, 'edge':False, 'contour':False, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'result_contour':False, 'result_max':False }
+
+_show_resize = [ 720, ( 'height', 'width' )[0] ]
+
+test_one_img = { 'test':True, 'filename': 'colony (20).jpg' }
 
 def main():
-    
-    if _local : 
-        g_l = '_local'
-    else:
-        g_l = '_global'
-    
+     
     file_n = 0
     switch_i = 0
 
@@ -70,409 +64,226 @@ def main():
         file_n = i
         each_scale_best_result = []        
         
-        fileName = 'candycrush2.jpg'  
+        if test_one_img['test'] and i > 0 :
+            break
+        
+        if test_one_img['test']:
+            fileName =  test_one_img['filename'] 
         
         print 'Input:',fileName
         
-        image = cv2.imread( input_path + fileName )
+        image_ori = cv2.imread( input_path + fileName )
       
-        height, width, channel = image.shape
-        image_ori = cv2.resize( image, (0,0), fx= resize_height/height, fy= resize_height/height)
+        height, width = image_ori.shape[:2]
+        image_resi = cv2.resize( image_ori, (0,0), fx= resize_height/height, fy= resize_height/height)
         
-        hsv = cv2.cvtColor( image, cv2.COLOR_BGR2HSV)
-        lab = cv2.cvtColor( image, cv2.COLOR_BGR2LAB)
-        
-        h = hsv[:,:,0]
-        s = hsv[:,:,1]
-        v = hsv[:,:,2]
-        
-        l = lab[:,:,0]
-        a = lab[:,:,1]
-        b = lab[:,:,2]
-        
-        _r = image[:,:,0]
-        _g = image[:,:,1]
-        _b = image[:,:,2]
-        
+        if _showImg['original']:
+            cv2.imshow( fileName + ' origianl', ShowResize(image_resi) )
+            cv2.waitKey(0)
+        if _writeImg['original']:
+            cv2.imwrite(output_path+fileName, image_resi )
        
-  
-        
-        #for i in xrange(height):
-            #for k in xrange(width):
-                #hsv[i,k] = (hsv[i][k][0],hsv[i][k][1],255)
-                
-        #hsv = cv2.cvtColor( hsv, cv2.COLOR_HSV2BGR)
-        
-        ratio = 0.4
-        ratio = 280/ float( image_ori.shape[0] )
-        
-        combine_imagergb = np.concatenate((_r, _g), axis=1)  
-        combine_imagergb = np.concatenate((combine_imagergb, _b), axis=1)
-        #cv2.imshow('img_rgb_split',cv2.resize(combine_imagergb,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.waitKey(0)        
-        
-        combine_image = np.concatenate((image,  hsv), axis=1)  
-        combine_imagehsv = np.concatenate((h, s), axis=1)  
-        combine_imagehsv = np.concatenate((combine_imagehsv, v), axis=1)
-        #cv2.imshow('img_hsv',cv2.resize(combine_image,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.imshow('img_hsv_split',cv2.resize(combine_imagehsv,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.waitKey(0)
-        
-        combine_image = np.concatenate((image,  lab), axis=1)  
-        combine_imagelab = np.concatenate((l, a), axis=1)  
-        combine_imagelab = np.concatenate((combine_imagelab, b), axis=1)
-        #cv2.imshow('img_lab',cv2.resize(combine_image,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.imshow('img_lab_split',cv2.resize(combine_imagelab,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.waitKey(0)  
-        
-        combine_image_all = np.concatenate((combine_imagergb, combine_imagehsv), axis=0) 
-        combine_image_all = np.concatenate((combine_image_all, combine_imagelab), axis=0)
-        #cv2.imshow('img_split',cv2.resize(combine_image_all,(0,0),fx = ratio ,fy=ratio ))
-        #cv2.waitKey(0)  
-        #cv2.imwrite( output_path + fileName[:-4] +'-rgb-hsv-lab.jpg', combine_image_all)
-        #if True:
-            #continue
-        #image_ori = image.copy()
-        
         for j in xrange(2):
             
             scale = 1.0/(2**j)
             print 'Scale:', scale           
             str_scale = '1_'+str(2**j)
-            image = cv2.resize( image_ori, (0,0), fx= scale, fy= scale)        
-            image = cv2.GaussianBlur(image, (5, 5),0)
+            image_resi = cv2.resize( image_resi, (0,0), fx= scale, fy= scale)        
+            image_resi = cv2.GaussianBlur(image_resi, (5, 5),0)
                
             if _sharpen :
                 print 'Sharpening'
-                image = Sharpen(image)
+                image_resi = Sharpen(image_resi)
                   
-            re_height, re_width = image.shape[:2]
+            re_height, re_width = image_resi.shape[:2]
                       
             offset_r = re_height/split_n_row
             offset_c = re_width/split_n_column
-           
-            if _local :
                 
-                print 'Detect edge'
-                edged = np.zeros(image.shape[:2], np.uint8) 
-                edged_hsv = np.zeros(image.shape[:2], np.uint8) 
-                edged_rgb = np.zeros(image.shape[:2], np.uint8)                 
-                edged_r = edged_rgb.copy()
-                edged_g = edged_rgb.copy()
-                edged_b = edged_rgb.copy()
-                #edged_lab = np.zeros(image.shape[:2], np.uint8) 
-                binary = np.zeros(image.shape[:2], np.uint8) 
-                
-                for row_n in np.arange(0,split_n_row,0.5):
-                    for column_n in np.arange(0,split_n_column,0.5):
-                        
-                        r_l =  int(row_n*offset_r)
-                        r_r = int((row_n+1)*offset_r)
-                        c_l = int(column_n*offset_c)
-                        c_r = int((column_n+1)*offset_c)
-                        if row_n == split_n_row-0.5 :
-                            r_r = int(re_height)
-                        if column_n == split_n_column-0.5 :
-                            c_r = int(re_width)    
-                            
-                        gray = cv2.cvtColor( image[ r_l : r_r , c_l : c_r ], cv2.COLOR_BGR2GRAY) 
-                        hsv = cv2.cvtColor( image[ r_l : r_r , c_l : c_r ], cv2.COLOR_BGR2HSV)
-                        hsv = cv2.GaussianBlur(hsv, (5, 5), 0)
-                        h = hsv[:,:,0]
-                        s = hsv[:,:,1]
-                        v = hsv[:,:,2]   
-                        h = cv2.GaussianBlur(h, (5, 5), 0)
-                        s = cv2.GaussianBlur(s, (5, 5), 0)
-                        v = cv2.GaussianBlur(v, (5, 5), 0)
-                        high_thresh_h, bi_h = cv2.threshold(h,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_s, bi_s = cv2.threshold(s,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_v, bi_v = cv2.threshold(v,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        _b = image[ r_l : r_r , c_l : c_r ][:,:,0]
-                        _g = image[ r_l : r_r , c_l : c_r ][:,:,1]
-                        _r = image[ r_l : r_r , c_l : c_r ][:,:,2]   
-                        _b = cv2.GaussianBlur(_b, (5, 5), 0)
-                        _g = cv2.GaussianBlur(_g, (5, 5), 0)
-                        _r = cv2.GaussianBlur(_r, (5, 5), 0)
-                        high_thresh_b, bi_b = cv2.threshold(_b,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_g, bi_g = cv2.threshold(_g,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_r, bi_r = cv2.threshold(_r,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)                        
-                        
-                        lab = cv2.cvtColor( image[ r_l : r_r , c_l : c_r ], cv2.COLOR_BGR2LAB)
-                        lab = cv2.GaussianBlur(lab, (5,5), 0)
-                        l = lab[:,:,0]
-                        a = lab[:,:,1]
-                        b = lab[:,:,2]
-                        l = cv2.GaussianBlur(l, (5, 5), 0)
-                        a = cv2.GaussianBlur(a, (5, 5), 0)
-                        b = cv2.GaussianBlur(b, (5, 5), 0)  
-                        high_thresh_l, bi_l = cv2.threshold(l,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_a, bi_a = cv2.threshold(a,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        high_thresh_b, bi_b = cv2.threshold(b,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)                        
-                        
-                        
-                        #LAB = cv2.cvtColor( image[ r_l : r_r , c_l : c_r ], cv2.COLOR_BGR2LAB)
-                        #gray = LAB2Gray(LAB)
-                        
-                        #cv2.imshow('gray',gray)
-                        #cv2.waitKey(0)                         
-                        
-                      
-                        gray = cv2.GaussianBlur(gray, (5, 5), 0)
-                        if _equalization:
-                            gray = cv2.equalizeHist(gray)
-                        #print gray
-                        #cv2.imshow('gray',gray)
-                        #cv2.waitKey(0)                        
-                        
-                        high_thresh,th2 = cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                        low_thresh = 0.5 * high_thresh  
-                        #ROI all background
-                        if high_thresh < 20 :
-                            continue
-                        #if high_thresh_s < 20 :
-                            #continue                        
-                        #print 'high_thresh:',high_thresh
-                        
-                        
-                        edged[ r_l : r_r , c_l : c_r ] = edged[ r_l : r_r , c_l : c_r ] | cv2.Canny(gray, low_thresh, high_thresh)
-                        #edged_hsv[ r_l : r_r , c_l : c_r ] = edged_hsv[ r_l : r_r , c_l : c_r ] | cv2.Canny(h, high_thresh_h*0.5, high_thresh_h) | cv2.Canny(s, high_thresh_s*0.5, high_thresh_s) | cv2.Canny(v, high_thresh_v*0.5, high_thresh_v)
-                        #edged_hsv[ r_l : r_r , c_l : c_r ] = edged_hsv[ r_l : r_r , c_l : c_r ] | cv2.Canny(s, high_thresh_s*0.5, high_thresh_s)| cv2.Canny(v, high_thresh_v*0.5, high_thresh_v) 
-                        #edged_hsv[ r_l : r_r , c_l : c_r ] = edged_hsv[ r_l : r_r , c_l : c_r ] | cv2.Canny(h, high_thresh_h*0.5, high_thresh_h) 
-                        #edged_hsv[ r_l : r_r , c_l : c_r ] = edged_hsv[ r_l : r_r , c_l : c_r ] | cv2.Canny(s, high_thresh_s*0.5, high_thresh_s) 
-                        edged_hsv[ r_l : r_r , c_l : c_r ] = edged_hsv[ r_l : r_r , c_l : c_r ] | cv2.Canny(v, high_thresh_v*0.5, high_thresh_v) | cv2.Canny(l, high_thresh_l*0.5, high_thresh_l)
-                        #edged_lab[ r_l : r_r , c_l : c_r ] = edged_lab[ r_l : r_r , c_l : c_r ] | cv2.Canny(a, high_thresh_a*0.5, high_thresh_a)| cv2.Canny(b, high_thresh_b*0.5, high_thresh_b)
-                       
-                        if high_thresh_r > 20 :
-                            edged_r[ r_l : r_r , c_l : c_r ] = edged_r[ r_l : r_r , c_l : c_r ] | cv2.Canny(_r, high_thresh_r*0.5, high_thresh_r) 
-                        if high_thresh_g > 20 :
-                            edged_g[ r_l : r_r , c_l : c_r ] = edged_g[ r_l : r_r , c_l : c_r ] | cv2.Canny(_g, high_thresh_g*0.5, high_thresh_g)
-                        if high_thresh_b > 20 :
-                            edged_b[ r_l : r_r , c_l : c_r ] = edged_b[ r_l : r_r , c_l : c_r ] | cv2.Canny(_b, high_thresh_b*0.5, high_thresh_b)
-                        
-                        edged_rgb[ r_l : r_r , c_l : c_r ] = edged_rgb[ r_l : r_r , c_l : c_r ] | edged_r[ r_l : r_r , c_l : c_r ] | edged_g[ r_l : r_r , c_l : c_r ] | edged_b[ r_l : r_r , c_l : c_r ]
-                        
-                        #binary[ r_l : r_r , c_l : c_r ] = th2                     
-                        #cv2.imshow('gray',gray)
-                        #cv2.imshow('edged',edged)
-                        #cv2.waitKey(0)                        
-                          
-            else:
-                gray = cv2.cvtColor( image, cv2.COLOR_BGR2GRAY)
-                gray = cv2.GaussianBlur(gray, (5, 5), 0)
-                if _equalization:
-                    gray = cv2.equalizeHist(gray)
-                
-                #cv2.imshow('gray',gray)
-                #cv2.imshow('equalize',gray_g)
-                #cv2.waitKey(0)
-                high_thresh,th2 = cv2.threshold(gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-                low_thresh = 0.5 * high_thresh
-                edged = cv2.Canny(gray, low_thresh, high_thresh)
-                print 'low_thresh:',low_thresh, ' high_thresh:', high_thresh
-                
+            print 'Detect edge'
+            edged = np.zeros(image_resi.shape[:2], np.uint8) 
+            
+            for row_n in np.arange(0,split_n_row,0.5):
+                for column_n in np.arange(0,split_n_column,0.5):
+                    
+                    r_l =  int(row_n*offset_r)
+                    r_r = int((row_n+1)*offset_r)
+                    c_l = int(column_n*offset_c)
+                    c_r = int((column_n+1)*offset_c)
+                    
+                    if row_n == split_n_row-0.5 :
+                        r_r = int(re_height)
+                    if column_n == split_n_column-0.5 :
+                        c_r = int(re_width)    
+                                               
+                    BGR_dic, HSV_dic, LAB_dic = SplitColorChannel( image_resi[ r_l : r_r , c_l : c_r ] )
+                                           
+                    channel_img_dic = { 'bgr_gray':BGR_dic['img_bgr_gray'], 'b':BGR_dic['img_b'], 'g':BGR_dic['img_g'], 'r':BGR_dic['img_r'], 'h':HSV_dic['img_h'], 's':HSV_dic['img_s'], 'v':HSV_dic['img_v'], 'l':LAB_dic['img_l'], 'a':LAB_dic['img_a'], 'b':LAB_dic['img_b'] }
+                    channel_thre_dic = { 'bgr_gray':BGR_dic['thre_bgr_gray'], 'b':BGR_dic['thre_b'], 'g':BGR_dic['thre_g'], 'r':BGR_dic['thre_r'], 'h':HSV_dic['thre_h'], 's':HSV_dic['thre_s'], 'v':HSV_dic['thre_v'], 'l':LAB_dic['thre_l'], 'a':LAB_dic['thre_a'], 'b':LAB_dic['thre_b'] }
+                    
+                    for chan in _edge_by_channel:
+                        if channel_thre_dic[chan] > 20 :
+                            edged[ r_l : r_r , c_l : c_r ] = edged[ r_l : r_r , c_l : c_r ] | cv2.Canny( channel_img_dic[chan], 0.5*channel_thre_dic[chan], channel_thre_dic[chan] )
+            
+            # end edge detect for  
+            image_resi = cv2.resize( image_resi, (0,0), fx= 1.0/scale, fy= 1.0/scale)
             edged = cv2.resize( edged, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            edged_hsv = cv2.resize( edged_hsv, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            edged_rgb = cv2.resize( edged_rgb, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            edged_r = cv2.resize( edged_r, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            edged_g = cv2.resize( edged_g, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            edged_b = cv2.resize( edged_b, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            #cv2.imshow('binary',cv2.resize( binary, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged_lab',cv2.resize( edged_lab, (0,0), fx= resize_ratio, fy= resize_ratio))
-            cv2.imshow('edged_hsv',cv2.resize( edged_hsv, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged_r',cv2.resize( edged_r, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged_g',cv2.resize( edged_g, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged_b',cv2.resize( edged_b, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged_rgb',cv2.resize( edged_rgb, (0,0), fx= resize_ratio, fy= resize_ratio))
-            #cv2.imshow('edged',cv2.resize( edged, (0,0), fx= resize_ratio, fy= resize_ratio))
-            cv2.imshow('image_ori',cv2.resize( image_ori, (0,0), fx= resize_ratio, fy= resize_ratio))
-            cv2.waitKey(0)                    
+            
+            if _showImg['edge']:
+                cv2.imshow( fileName + ' edge', ShowResize(edged) )
+                cv2.waitKey(0)
+            if _writeImg['edge']:
+                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_edge.jpg', edged )                  
             
             print 'Find countour'
-            contours = cv2.findContours(edged_hsv,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)[-2]
-            #contours_hsv = cv2.findContours(edged_hsv,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)[-2]
-            contours_rgb = cv2.findContours(edged_rgb,cv2.RETR_LIST,cv2.CHAIN_APPROX_NONE)[-2]
-            #contours_lab = cv2.findContours(edged_lab,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)[-2]
-            #print contours
-            #contour_image_lab = np.zeros(image_ori.shape,np.uint8)
-            contour_image_rgb = np.zeros(image_ori.shape,np.uint8)
-            #contour_image_hsv = np.zeros(image_ori.shape,np.uint8)
-            contour_image = np.zeros(image_ori.shape, np.uint8)
+            contours = cv2.findContours(edged,cv2.RETR_LIST,cv2.CHAIN_APPROX_NONE)[-2]
+                 
+            noise = 0  
             contour_list = []
-            
-            #cv2.drawContours( contour_image_lab, contours_lab, -1, GREEN, 1 )            
-            #cv2.drawContours( contour_image_hsv, contours_hsv, -1, GREEN, 1 )
-            #cv2.drawContours( contour_image, contours, -1, GREEN, 1 )
-            #cv2.imshow('contour_image_lab',contour_image_lab)
-            #cv2.imshow('contour_image_hsv',contour_image_hsv)
-            #cv2.imshow('contour_image',contour_image)
-            #cv2.waitKey(0) 
-            ind = 0
-            contour_image_rgb[:] = BLACK
-            #for c in contours_lab :
-                #ind = (ind+1) % len(switchColor)
-                #if len(c) < 50:
-                    #continue
-                
-                #cv2.drawContours( contour_image_lab, [c], -1, switchColor[ind], 1 )            
-            for c in contours :
-                ind = (ind+1) % len(switchColor)
-                             
-                cv2.drawContours( contour_image_rgb, [c], -1, switchColor[ind], 1 )
-            ###cv2.imshow('contour_image_ab',contour_image_lab)
-            cv2.imshow('contour_image',contour_image_rgb)
-            cv2.waitKey(0)  
-            #cv2.imwrite(output_path + fileName[:-4] +'_scale['+str_scale+'].jpg', contour_image_hsv )
-            #if True :
-                #continue
-            noise = 0
-                  
             for c in contours:
                 
+                # remove contour whose density is too large or like a line
                 convexhull_area = cv2.contourArea(cv2.convexHull( np.array(c)) ) 
-              
                 if convexhull_area == 0 or ( len(c) > 30 and float(len(c)) / convexhull_area > 0.5 ) or ( len(c) <= 30 and float(len(c)) / convexhull_area > 0.75 ): 
                     noise+=1
                     continue
+                
+                # remove contour which has too many edge
                 peri = cv2.arcLength(c, True)
                 approx = cv2.approxPolyDP(c, 0.02 * peri, True)
                 if len(approx) > 20 : 
                     continue
+                
                 #if len(c) < 100 : 
                     #continue
                     
                 contour_list.append(c)
-                #cv2.drawContours( contour_image, [c], -1, GREEN, 1 )
-            #cv2.imshow('contour_image',contour_image)
-            #cv2.imshow('image_ori',image_ori)
-            #cv2.waitKey(0)                        
+            # end filter contour for
+            
+            # remove outer contour of two overlapping contours whose sizes are close          
             if _check_overlap :     
                 print 'Remove overlap'
                 contour_list = CheckOverlap(contour_list)
  
-            #print 'contour_list:',len(contour_list),'noise:',noise
             if len(contour_list) == 0 :
                 continue
             
+            # draw contour by different color
+            contour_image = np.zeros( image_resi.shape, np.uint8 )
+            color_index = 0 
+            for c in contours :
+                COLOR = switchColor[ color_index % len(switchColor) ]     
+                color_index += 1
+                cv2.drawContours( contour_image, [c], -1, COLOR, 1 )
+    
+            if _showImg['contour']:
+                cv2.imshow( fileName + ' countour', ShowResize(contour_image) )
+                cv2.waitKey(0)
+            if _writeImg['contour']:
+                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_contour.jpg', contour_image )
+            
+            
             print 'Extract contour feature'
             # Get contour feature
-            c_list, cnt_shape_list, cnt_color_list, cnt_size_list = get_contour_feature.extract_feature( image_ori, contour_list )
-            
-            #cnt_img = image_ori.copy()
-            #for i in xrange( len(cnt_shape_list)-1 ):
-                #for j in xrange( i+1,len(cnt_shape_list)):
-                    #print '--------------------------------'
-                    #print 'shape Distance:',cluster_evaluate.Eucl_distance(cnt_shape_list[i], cnt_shape_list[j])
-                    #print 'size Distance:',cluster_evaluate.Eucl_distance(cnt_size_list[i], cnt_size_list[j])
-                    #print 'color Distance:',cluster_evaluate.Eucl_distance(cnt_color_list[i], cnt_color_list[j])
-                    #cv2.drawContours( cnt_img, c_list[i], -1, GREEN, 2 )
-                    #cv2.drawContours( cnt_img, c_list[j], -1, RED, 2 )
-                    #combine_image = np.concatenate((image_ori, cnt_img), axis=1)  
-                    
-                    #cv2.imshow('compare',cv2.resize(combine_image,(0,0),fx=1000.0/combine_image.shape[1],fy=1000.0/combine_image.shape[1]))
-                    #cv2.waitKey(0)
-                    #cnt_img = image_ori.copy()
-                    
-            # make feature dictionary
-            feature_group_list = []
-            for i in xrange( len(c_list) ):
-                feature_group_list.append( { 'cnt':c_list[i], 'shape':cnt_shape_list[i], 'color':cnt_color_list[i], 'size':cnt_size_list[i] } )
-            
-            total_feature_group_list = { 'cnt':c_list, 'shape':cnt_shape_list, 'color':cnt_color_list, 'size':cnt_size_list }
-            
-            # make it a group
-            feature_group_list = [feature_group_list]
-            
-            contour_image = np.zeros(image_ori.shape, np.uint8)
-                         
+            c_list, cnt_shape_list, cnt_color_list, cnt_size_list = get_contour_feature.extract_feature( image_resi, contour_list )
+
+            feature_dic = { 'cnt':c_list, 'shape':cnt_shape_list, 'color':cnt_color_list, 'size':cnt_size_list }
+        
             para = [ 'size', 'shape' , 'color' ] 
             
-            #std_dic = { 'size':cluster_evaluate.Standard_deviation( cnt_size_list ), 'shape':cluster_evaluate.Standard_deviation( cnt_shape_list ) , 'color':cluster_evaluate.Standard_deviation( cnt_color_list ) }
-           
-               
-                
-            #para = ['shape_list', 'size_list']
-            
+            # total contour number
             cnt_N = len(c_list)
             
-            label_set_list = []
-            label_group_dic = {}
+            label_list_dic = {}
+            
             print 'Respectively use shape, color, and size as feature set to cluster'
             # Respectively use shape, color, and size as feature set to cluster
             for para_index in xrange( len(para) ):
-                #print '--------------------------------'
-                print 'para:',para[para_index]
                 
-                #std = std_dic[para[para_index]]
-       
-                contour_feature_list =  total_feature_group_list[para[para_index]]
+                print 'para:',para[para_index]
+   
+                contour_feature_list =  feature_dic[para[para_index]]
                 
                 # hierarchical clustering
-                label_list = Hierarchical_clustering(contour_feature_list,fileName,para[para_index],str_scale)   
+                label_list = Hierarchical_clustering( contour_feature_list, fileName, para[para_index], str_scale )   
                 
                 unique_label, label_counts = np.unique(label_list, return_counts=True)
                 
-                contour_image = np.zeros(image_ori.shape, np.uint8)
+                # draw contours of each group refer to the result clustered by size, shape or color
+                contour_image = np.zeros(image_resi.shape, np.uint8)
                 contour_image[:] = BLACK                      
-                color_index = 0
+                color_index = 0    
                 for label in unique_label :
                     COLOR = switchColor[ color_index % len(switchColor) ]
                     color_index += 1
                     tmp_splited_group = []
                     for i in xrange( len(label_list) ):
                         if label_list[i] == label :
-                            tmp_splited_group.append( c_list[i] )
-                            
+                            tmp_splited_group.append( c_list[i] )                        
                     cv2.drawContours( contour_image, np.array(tmp_splited_group), -1, COLOR, 2 )
-                cv2.imshow(para[para_index], cv2.resize( contour_image, (0,0), fx = resize_ratio, fy = resize_ratio))
-                cv2.waitKey(0)
-                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_para['+para[para_index]+'].jpg', contour_image ) 
                 
-                label_group_dic[para[para_index]] = label_list
+                if _showImg[para[para_index]]:
+                    cv2.imshow( 'cluster by :'+ para[para_index], ShowResize(contour_image) )
+                    cv2.waitKey(0)
+                if _writeImg[para[para_index]]:
+                    cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_para['+para[para_index]+'].jpg', contour_image ) 
+                
+                label_list_dic[para[para_index]] = label_list
                 
             # end para_index for
+            
+            # intersect the label clustered by size, shpae, and color
             combine_label_list = []
             for i in xrange( cnt_N ):
-                combine_label_list.append( str(label_group_dic['size'][i]) + '_' + str(label_group_dic['shape'][i]) + '_' + str(label_group_dic['color'][i])  )
-            
-            contour_image = np.zeros(image_ori.shape, np.uint8)
-            contour_image[:] = BLACK     
-            contour_image_max = np.zeros(image_ori.shape, np.uint8)
-            contour_image_max[:] = BLACK             
-            color_index = 0   
-            total_group = []
-            
-            unique_label, label_counts = np.unique(combine_label_list, return_counts=True)
+                combine_label_list.append( str(label_list_dic['size'][i]) + '_' + str(label_list_dic['shape'][i]) + '_' + str(label_list_dic['color'][i])  )
+                
+            unique_label, label_counts = np.unique(combine_label_list, return_counts=True)      
             label_dic = dict(zip(unique_label, label_counts))
             max_label = max( label_dic.iteritems(), key=operator.itemgetter(1) )[0]
-            
+       
+            # find the final group by the intersected label and draw
+            final_group = []  
+            contour_image = np.zeros(image_resi.shape, np.uint8)
+            contour_image[:] = BLACK     
+            contour_image_max = np.zeros(image_resi.shape, np.uint8)
+            contour_image_max[:] = BLACK             
+            color_index = 0             
             for label in unique_label :
                 COLOR = switchColor[ color_index % len(switchColor) ]
                 color_index += 1
-                tmp_combine_group = []
+                tmp_group = []
                 for i in xrange( cnt_N ):
                     if combine_label_list[i] == label :
-                        tmp_combine_group.append( c_list[i] ) 
+                        tmp_group.append( c_list[i] ) 
                 if label == max_label :
-                    tmp_combine_group = CheckOverlap(tmp_combine_group)
-                    cv2.drawContours( contour_image_max, np.array(tmp_combine_group), -1, RED, 2 )
+                    tmp_group = CheckOverlap(tmp_group)
+                    cv2.drawContours( contour_image_max, np.array(tmp_group), -1, RED, 2 )
                 else:
-                    cv2.drawContours( contour_image_max, np.array(tmp_combine_group), -1, GREEN, 1 ) 
+                    cv2.drawContours( contour_image_max, np.array(tmp_group), -1, GREEN, 1 ) 
                     
-                cv2.drawContours( contour_image, np.array(tmp_combine_group), -1, COLOR, 2 )
-                total_group.append(tmp_combine_group)
-            cv2.imshow(fileName+' combine', cv2.resize( contour_image, (0,0), fx = resize_ratio, fy = resize_ratio))
-            cv2.waitKey(0)            
+                cv2.drawContours( contour_image, np.array(tmp_group), -1, COLOR, 2 )
+                final_group.append(tmp_group)
+                
+            # end find final group for
+            # sort the group from the max goup to min group and get max count
+            final_group.sort( key = lambda x:len(x), reverse = True )
+            count = len( final_group[0] )  
             
-            total_group.sort( key = lambda x:len(x), reverse = True )
-            count = len( total_group[0] )
-            combine_image = np.concatenate((image_ori, contour_image), axis=1) 
-            combine_image_max = np.concatenate((image_ori, contour_image_max), axis=1) 
+            combine_image = np.concatenate((image_resi, contour_image), axis=1) 
+            combine_image_max = np.concatenate((image_resi, contour_image_max), axis=1) 
             
-            cv2.imshow(fileName, cv2.resize( combine_image, (0,0), fx = resize_ratio, fy = resize_ratio) ) 
-            cv2.imshow(fileName+' max', cv2.resize( combine_image_max, (0,0), fx = resize_ratio, fy = resize_ratio) ) 
-            cv2.waitKey(0)
-            cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+']_max.jpg', combine_image_max ) 
-            cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+'].jpg', combine_image ) 
+            if _showImg['result_contour']:
+                cv2.imshow(fileName+' final group', ShowResize(contour_image) )
+                cv2.waitKey(0)     
+            if _writeImg['result_contour']:
+                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+'].jpg', combine_image ) 
+            if _showImg['result_max']:
+                cv2.imshow(fileName+' final max group', ShowResize(contour_image_max) )
+                cv2.waitKey(0)     
+            if _writeImg['result_max']:
+                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+']_max.jpg', combine_image_max )                
+              
+            # append each scale result            
             each_scale_best_result.append( { 'filename':fileName, 'img':combine_image, 'count':count } )
             
         #end scale for
@@ -508,7 +319,7 @@ def Sharpen(img):
    
     return cv2.filter2D(img, -1, kernel_sharpen) 
 
-def draw_image( image_ori, c_list, label_list, max_label ):
+def draw_image( image_resi, c_list, label_list, max_label ):
     
     if type(label_list) != np.ndarray :
         label_list = np.array(label_list)
@@ -516,8 +327,8 @@ def draw_image( image_ori, c_list, label_list, max_label ):
     samples_mask = np.zeros_like(c_list, dtype=bool)
     samples_mask[:] = True     
     index_mask = ( label_list == max_label )
-    image = image_ori.copy()
-    contour_image = np.zeros(image_ori.shape, np.uint8)
+    image = image_resi.copy()
+    contour_image = np.zeros(image_resi.shape, np.uint8)
     contour_image[:] = BLACK            
 
     c_list = np.array(c_list)
@@ -594,6 +405,61 @@ def IsOverlapAll( cnt, cnt_list ):
     
     return False
 
+def SplitColorChannel( img ):
+    
+    bgr_gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY) 
+    bgr_gray = cv2.GaussianBlur(bgr_gray, (5, 5), 0)  
+    thresh_bgr_gray = cv2.threshold(bgr_gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]    
+    
+    bgr_b = img[:,:,0]
+    bgr_g = img[:,:,1]
+    bgr_r = img[:,:,2]   
+    bgr_b = cv2.GaussianBlur(bgr_b, (5, 5), 0)
+    bgr_g = cv2.GaussianBlur(bgr_g, (5, 5), 0)
+    bgr_r = cv2.GaussianBlur(bgr_r, (5, 5), 0)
+    thresh_bgr_b = cv2.threshold(bgr_b,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_bgr_g = cv2.threshold(bgr_g,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_bgr_r = cv2.threshold(bgr_r,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]    
+    
+    hsv = cv2.cvtColor( img, cv2.COLOR_BGR2HSV)
+    hsv = cv2.GaussianBlur(hsv, (5, 5), 0)
+    hsv_h = hsv[:,:,0]
+    hsv_s = hsv[:,:,1]
+    hsv_v = hsv[:,:,2]   
+    hsv_h = cv2.GaussianBlur(hsv_h, (5, 5), 0)
+    hsv_s = cv2.GaussianBlur(hsv_s, (5, 5), 0)
+    hsv_v = cv2.GaussianBlur(hsv_v, (5, 5), 0)
+    thresh_hsv_h = cv2.threshold(hsv_h,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_hsv_s = cv2.threshold(hsv_s,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_hsv_v = cv2.threshold(hsv_v,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]                           
+
+    lab = cv2.cvtColor( img, cv2.COLOR_BGR2LAB)
+    lab = cv2.GaussianBlur(lab, (5,5), 0)
+    lab_l = lab[:,:,0]
+    lab_a = lab[:,:,1]
+    lab_b = lab[:,:,2]
+    lab_l = cv2.GaussianBlur(lab_l, (5, 5), 0)
+    lab_a = cv2.GaussianBlur(lab_a, (5, 5), 0)
+    lab_b = cv2.GaussianBlur(lab_b, (5, 5), 0)  
+    thresh_lab_l = cv2.threshold(lab_l,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_lab_a = cv2.threshold(lab_a,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]
+    thresh_lab_b = cv2.threshold(lab_b,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]   
+    
+    return { 'img_bgr_gray':bgr_gray, 'img_bgr':img, 'img_b':bgr_b, 'img_g':bgr_g, 'img_r':bgr_r, 'thre_bgr_gray':thresh_bgr_gray, 'thre_b':thresh_bgr_b, 'thre_g':thresh_bgr_g, 'thre_r':thresh_bgr_r 
+             },{ 'img_hsv':hsv, 'img_h':hsv_h, 'img_s':hsv_s, 'img_v':hsv_v, 'thre_h':thresh_hsv_h, 'thre_s':thresh_hsv_s, 'thre_v':thresh_hsv_v 
+                 },{ 'img_lab':lab, 'img_l':lab_l, 'img_a':lab_a, 'img_b':lab_b, 'thre_l':thresh_lab_l, 'thre_a':thresh_lab_a, 'thre_b':thresh_lab_b }
+
+def ShowResize( img ):
+    
+    h, w = img.shape[:2]
+    
+    if _show_resize[1] == 'height':
+        ratio = _show_resize[0] / float(h)
+    else :
+        ratio = _show_resize[0] / float(w)
+    
+    return cv2.resize( img, (0,0), fx = ratio, fy = ratio )
+        
 def MinDistance(cnt):
     
     cM = GetMoment(cnt)
@@ -672,15 +538,19 @@ def Hierarchical_clustering( cnt_list, fileName, para, str_scale, cut_method = '
             
         cut_point_list.sort( key = lambda x : x[1], reverse = True )
         
-        print 'cut index:',cut_point_list[0][0]
+        print 'cut index:',cut_point_list[0][0]+1,' diff len:',len(acceleration)
         max_d = last[cut_point_list[0][0]]
         #max_d = last[acceleration.argmax()]
     #elif cut_method == 'inconsistency':
     
     plt.bar(left=range(len(acceleration)),height=acceleration)   
     plt.title( para+' cut_point : '+str(cut_point_list[0][0]+1)+'  | value: '+str(acceleration[cut_point_list[0][0]]))
-    #plt.savefig(output_path+fileName[:-4]+'_scale['+str_scale+']_para['+para+']_his.jpg')
-    plt.show()
+    
+    if _showImg['histogram']:
+        plt.show()
+    if _writeImg['histogram']:
+        plt.savefig(output_path+fileName[:-4]+'_scale['+str_scale+']_para['+para+']_his.jpg')    
+        
     if ONE_group:
         print 'all in one group!'
         return [0]*len(cnt_list) 
