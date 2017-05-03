@@ -1,9 +1,7 @@
 import cv2, time
-from scipy.fftpack import fft, ifft
-import wave, random, struct, sys
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import cluster_evaluate
 import math
 
 GREEN = (0,255,0)
@@ -56,9 +54,13 @@ def extract_feature( image, contours ):
             
             v1 = ( c[0][0]-cx, (cy-c[0][1]) )
             v2 = (0,height)
-            angle = np.arccos(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
             
-            angle = angle*180/np.pi
+            if (np.linalg.norm(v1) * np.linalg.norm(v2)) == 0:
+                angle = 180.0
+            else:
+                angle = np.arccos( np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)) )
+                angle = angle*180/np.pi
+                
             if( v1[0] < 0 ):
                 angle = 180 - angle       
            
@@ -189,7 +191,7 @@ def FindCntAvgColorInetnsity( cnt, img ):
     num = len(cnt_lab)
     
     if num < 1 :
-        return 0
+        return [0.0,0.0,0.0]
             
     avg_lab = [ 0.0, 0.0, 0.0 ]
     for lab in cnt_lab : 

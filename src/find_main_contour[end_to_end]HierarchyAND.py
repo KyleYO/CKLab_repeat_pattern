@@ -3,16 +3,16 @@ import cv2
 import os 
 import time
 import get_contour_feature
-import dbscan_cluster
 import operator
 from operator import itemgetter
-import cluster_evaluate
 from scipy.cluster.hierarchy import cophenet
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.cluster.hierarchy import fcluster
+import matplotlib
 import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
+
 
 GREEN = (0,255,0)
 BLUE = (255,0,0)
@@ -29,20 +29,25 @@ switchColor = [(255,255,0),(255,0,255),(0,255,255),(255,0,0),(0,255,0),(255,128,
 resize_height = 736.0
 split_n_row = 16
 split_n_column = 16
+gaussian_para = 5
 
 _sharpen = True
 _check_overlap = False
+_remove_too_many_edge = True
+_remove_high_density = False
 
 input_path = '../../input_image/'
-output_path = '../test/combine/output_hierarchy/'
+input_path = '../../input_animal/'
+output_path = '../../output_image/'
+
 
 _edge_by_channel = ['v','l']
-_showImg = { 'original':True, 'edge':True, 'contour':True, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'result_contour':True, 'result_max':True }
-_writeImg = { 'original':False, 'edge':False, 'contour':False, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'result_contour':False, 'result_max':False }
+_showImg = { 'original':True, 'edge':True, 'contour':True, 'remove_overlap':True, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'each_group_result_contour':True, 'result_contour':True, 'result_max':True }
+_writeImg = { 'original':False, 'edge':False, 'contour':False, 'remove_overlap':False, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'each_group_result_contour':False, 'result_contour':False, 'result_max':False }
 
-_show_resize = [ 720, ( 'height', 'width' )[0] ]
+_show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
-test_one_img = { 'test':True, 'filename': 'colony (20).jpg' }
+test_one_img = { 'test':True , 'filename': 'test.bmp' }
 
 def main():
      
@@ -72,6 +77,10 @@ def main():
         
         print 'Input:',fileName
         
+        if not os.path.isfile( input_path + fileName ):
+            print 'FILE does not exist!'
+            break
+        
         image_ori = cv2.imread( input_path + fileName )
       
         height, width = image_ori.shape[:2]
@@ -83,13 +92,13 @@ def main():
         if _writeImg['original']:
             cv2.imwrite(output_path+fileName, image_resi )
        
-        for j in xrange(2):
+        for j in xrange(1):
             
             scale = 1.0/(2**j)
             print 'Scale:', scale           
             str_scale = '1_'+str(2**j)
             image_resi = cv2.resize( image_resi, (0,0), fx= scale, fy= scale)        
-            image_resi = cv2.GaussianBlur(image_resi, (5, 5),0)
+            image_resi = cv2.GaussianBlur(image_resi, (gaussian_para, gaussian_para),0)
                
             if _sharpen :
                 print 'Sharpening'
@@ -128,7 +137,6 @@ def main():
             # end edge detect for  
             image_resi = cv2.resize( image_resi, (0,0), fx= 1.0/scale, fy= 1.0/scale)
             edged = cv2.resize( edged, (0,0), fx= 1.0/scale, fy= 1.0/scale)
-            
             if _showImg['edge']:
                 cv2.imshow( fileName + ' edge', ShowResize(edged) )
                 cv2.waitKey(0)
@@ -136,26 +144,53 @@ def main():
                 cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_edge.jpg', edged )                  
             
             print 'Find countour'
-            contours = cv2.findContours(edged,cv2.RETR_LIST,cv2.CHAIN_APPROX_NONE)[-2]
-                 
+            contours = cv2.findContours(edged,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)[-2]
+            contour_image = np.zeros( image_resi.shape, np.uint8 )
+            color_index = 0 
+            for c in contours :
+                COLOR = switchColor[ color_index % len(switchColor) ]     
+                color_index += 1
+                cv2.drawContours( contour_image, [c], -1, COLOR, 1 )
+    
+            if _showImg['contour']:
+                cv2.imshow( fileName + ' countour1', ShowResize(contour_image) )
+                cv2.waitKey(0)                 
+            
+            tmp_cnt_list = [contours[0]]
+            tmp_cnt = contours[0]
+            for c in contours[1:]:
+                if not IsOverlap(tmp_cnt,c):
+                    tmp_cnt_list.append(c)
+                tmp_cnt = c
+                
+            contours = tmp_cnt_list
+            
             noise = 0  
             contour_list = []
             for c in contours:
                 
-                # remove contour whose density is too large or like a line
-                convexhull_area = cv2.contourArea(cv2.convexHull( np.array(c)) ) 
-                if convexhull_area == 0 or ( len(c) > 30 and float(len(c)) / convexhull_area > 0.5 ) or ( len(c) <= 30 and float(len(c)) / convexhull_area > 0.75 ): 
-                    noise+=1
-                    continue
+                if len(c) < 20 : 
+                    continue                
                 
-                # remove contour which has too many edge
-                peri = cv2.arcLength(c, True)
-                approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-                if len(approx) > 20 : 
-                    continue
+                if _remove_high_density :
+                    # remove contour whose density is too large or like a line
+                    convexhull_area = cv2.contourArea(cv2.convexHull( np.array(c)) ) 
+                    if convexhull_area == 0 or ( len(c) > 30 and float(len(c)) / convexhull_area > 0.5 ) or ( len(c) <= 30 and float(len(c)) / convexhull_area > 0.75 ): 
+                        noise+=1
+                        continue
                 
-                #if len(c) < 100 : 
-                    #continue
+                if _remove_too_many_edge :
+                    # remove contour which has too many edge
+                    peri = cv2.arcLength(c, True)
+                    approx = cv2.approxPolyDP(c, 0.005 * peri, True)
+                    #contour_image = np.zeros( image_resi.shape, np.uint8 )
+                    #cv2.drawContours( contour_image, [c], -1, GREEN, 1 )
+                    #cv2.imshow('edge number : '+str(len(approx)), ShowResize(contour_image))
+                    #cv2.waitKey(0)
+                    if len(approx) > 30 : 
+                        continue
+                
+                
                     
                 contour_list.append(c)
             # end filter contour for
@@ -170,17 +205,18 @@ def main():
             
             # draw contour by different color
             contour_image = np.zeros( image_resi.shape, np.uint8 )
+            contour_image[:] = BLACK
             color_index = 0 
-            for c in contours :
+            for c in contour_list :
                 COLOR = switchColor[ color_index % len(switchColor) ]     
                 color_index += 1
                 cv2.drawContours( contour_image, [c], -1, COLOR, 1 )
     
-            if _showImg['contour']:
-                cv2.imshow( fileName + ' countour', ShowResize(contour_image) )
+            if _showImg['remove_overlap']:
+                cv2.imshow( fileName + ' remove_overlap', ShowResize(contour_image) )
                 cv2.waitKey(0)
-            if _writeImg['contour']:
-                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_contour.jpg', contour_image )
+            if _writeImg['remove_overlap']:
+                cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_nonoverlap_contour.jpg', contour_image )
             
             
             print 'Extract contour feature'
@@ -246,39 +282,59 @@ def main():
             contour_image = np.zeros(image_resi.shape, np.uint8)
             contour_image[:] = BLACK     
             contour_image_max = np.zeros(image_resi.shape, np.uint8)
-            contour_image_max[:] = BLACK             
+            contour_image_max[:] = BLACK 
+            
+                        
             color_index = 0             
             for label in unique_label :
+                contour_image_each = image_resi.copy()
+                contour_image_each[:] = contour_image_each[:]/3.0
                 COLOR = switchColor[ color_index % len(switchColor) ]
                 color_index += 1
                 tmp_group = []
                 for i in xrange( cnt_N ):
                     if combine_label_list[i] == label :
                         tmp_group.append( c_list[i] ) 
-                if label == max_label :
-                    tmp_group = CheckOverlap(tmp_group)
+                
+                tmp_group = CheckOverlap(tmp_group)
+
+                if label == max_label :                  
                     cv2.drawContours( contour_image_max, np.array(tmp_group), -1, RED, 2 )
                 else:
                     cv2.drawContours( contour_image_max, np.array(tmp_group), -1, GREEN, 1 ) 
-                    
+            
                 cv2.drawContours( contour_image, np.array(tmp_group), -1, COLOR, 2 )
+                cv2.drawContours( contour_image_each, np.array(tmp_group), -1, COLOR, 2 )
+                
                 final_group.append(tmp_group)
+                
+                contour_image_each = cv2.resize( contour_image_each, (0,0), fx = float(image_ori.shape[0])/contour_image_each.shape[0], fy = float(image_ori.shape[0])/contour_image_each.shape[0])
+                
+                if _showImg['each_group_result_contour']:
+                    cv2.imshow(fileName+' | label:'+str(label)+' | count:'+str(len(tmp_group)), ShowResize(contour_image_each) )
+                    cv2.waitKey(0)     
+                if _writeImg['each_group_result_contour']:
+                    if len(tmp_group) > 2 :
+                        cv2.imwrite( output_path + fileName[:-4] +'_label['+str(label)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )                 
                 
             # end find final group for
             # sort the group from the max goup to min group and get max count
             final_group.sort( key = lambda x:len(x), reverse = True )
             count = len( final_group[0] )  
             
-            combine_image = np.concatenate((image_resi, contour_image), axis=1) 
-            combine_image_max = np.concatenate((image_resi, contour_image_max), axis=1) 
+            contour_image = cv2.resize( contour_image, (0,0), fx = height/resize_height, fy = height/resize_height)
+            contour_image_max = cv2.resize( contour_image_max, (0,0), fx = height/resize_height, fy = height/resize_height)
+            
+            combine_image = np.concatenate((image_ori, contour_image), axis=1) 
+            combine_image_max = np.concatenate((image_ori, contour_image_max), axis=1) 
             
             if _showImg['result_contour']:
-                cv2.imshow(fileName+' final group', ShowResize(contour_image) )
+                cv2.imshow(fileName+' final group ', ShowResize(contour_image) )
                 cv2.waitKey(0)     
             if _writeImg['result_contour']:
                 cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+'].jpg', combine_image ) 
             if _showImg['result_max']:
-                cv2.imshow(fileName+' final max group', ShowResize(contour_image_max) )
+                cv2.imshow(fileName+' final max group | Count['+str(count)+']', ShowResize(contour_image_max) )
                 cv2.waitKey(0)     
             if _writeImg['result_max']:
                 cv2.imwrite( output_path + fileName[:-4] +'_scale['+str_scale+']_Count['+str(count)+']_max.jpg', combine_image_max )                
@@ -318,6 +374,15 @@ def Sharpen(img):
                                  [-1,-1,-1,-1,-1]]) / 8.0  
    
     return cv2.filter2D(img, -1, kernel_sharpen) 
+
+def Eucl_distance(a,b):
+    
+    if type(a) != np.ndarray :
+        a = np.array(a)
+    if type(b) != np.ndarray :
+        b = np.array(b)
+    
+    return np.linalg.norm(a-b) 
 
 def draw_image( image_resi, c_list, label_list, max_label ):
     
@@ -387,7 +452,10 @@ def IsOverlap( cnt1, cnt2 ):
     c2M = GetMoment(cnt2)
     c1_min_d = MinDistance(cnt1)
     c2_min_d = MinDistance(cnt2)
-    moment_d = cluster_evaluate.Eucl_distance( c1M, c2M )
+    moment_d = Eucl_distance( c1M, c2M )
+    
+    if min(c1_min_d,c2_min_d) == 0:
+        return False
     
     return ( moment_d < c1_min_d or moment_d < c2_min_d ) and max(c1_min_d,c2_min_d)/min(c1_min_d,c2_min_d) <= 3
 
@@ -397,9 +465,9 @@ def IsOverlapAll( cnt, cnt_list ):
         return False
 
     for c in cnt_list :
-        if len(c) == len(cnt) and GetMoment(c) == GetMoment(cnt):
-            #print 'same one'
-            continue
+        #if len(c) == len(cnt) and GetMoment(c) == GetMoment(cnt):
+            ##print 'same one'
+            #continue
         if IsOverlap( cnt, c ) :
             return True
     
@@ -410,6 +478,7 @@ def SplitColorChannel( img ):
     bgr_gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY) 
     bgr_gray = cv2.GaussianBlur(bgr_gray, (5, 5), 0)  
     thresh_bgr_gray = cv2.threshold(bgr_gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]    
+    
     
     bgr_b = img[:,:,0]
     bgr_g = img[:,:,1]
@@ -463,9 +532,9 @@ def ShowResize( img ):
 def MinDistance(cnt):
     
     cM = GetMoment(cnt)
-    min_d = cluster_evaluate.Eucl_distance( (cnt[0][0][0],cnt[0][0][1]), cM )
+    min_d = Eucl_distance( (cnt[0][0][0],cnt[0][0][1]), cM )
     for c in cnt :
-        d = cluster_evaluate.Eucl_distance( (c[0][0],c[0][1]), cM ) 
+        d = Eucl_distance( (c[0][0],c[0][1]), cM ) 
         if d < min_d :
             min_d = d
             
@@ -499,11 +568,10 @@ def GetMoment(cnt):
         
     return float(cx)/num, float(cy)/num
 
-def Hierarchical_clustering( cnt_list, fileName, para, str_scale, cut_method = 'elbow' ):
+def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method = 'elbow' ):
     
     # hierarchically link cnt by order of distance from distance method 'ward'
-    cnt_hierarchy = linkage( cnt_list, 'ward')
-    rev = 10
+    cnt_hierarchy = linkage( feature_list, 'ward')
     
     max_d = 10
     if cut_method == 'elbow' or True:
@@ -517,43 +585,46 @@ def Hierarchical_clustering( cnt_list, fileName, para, str_scale, cut_method = '
         #print 'acceleration:',acceleration 
         
         if len(acceleration) < 2 :
-            return [0]*len(cnt_list)
+            return [0]*len(feature_list)
         avg_diff = sum(acceleration)/float(len(acceleration))
         tmp = acceleration[0]
         
-        ONE_group = True
-        ONE_group = False
+       
+        off_set = 10
         
         cut_point_list = []
         for i in xrange( 1,len(acceleration) ):
-            #if acceleration[i] > avg_diff and acceleration[i] > 20 * (tmp/ float(i)) : 
-                #max_d = last[i]
-                #ONE_group = False
-                #print 'cut index:',i
-                #break
+       
             if acceleration[i] > avg_diff:
-                cut_point_list.append( [ i, acceleration[i]/(tmp/float(i) ) ] )
+                #cut_point_list.append( [ i, acceleration[i]/(tmp/float(i) ) ] )
+                n = i - off_set
+                if n < 0 :
+                    n = 0
+                cut_point_list.append( [ i, acceleration[i]/( sum(acceleration[n:i]) / float(off_set) ) ] )
+                #print 'i:',i+1,' ratio:',acceleration[i]/( sum(acceleration[n:i]) / float(off_set) )
                 
             tmp += acceleration[i]
             
+        if len(cut_point_list) < 1 :
+            print 'all in one group!'
+            return [0]*len(feature_list)     
+        
         cut_point_list.sort( key = lambda x : x[1], reverse = True )
         
-        print 'cut index:',cut_point_list[0][0]+1,' diff len:',len(acceleration)
+        #print 'cut index:',cut_point_list[0][0]+1,' diff len:',len(acceleration)
         max_d = last[cut_point_list[0][0]]
+        max_ratio = cut_point_list[0][1]
         #max_d = last[acceleration.argmax()]
     #elif cut_method == 'inconsistency':
     
     plt.bar(left=range(len(acceleration)),height=acceleration)   
-    plt.title( para+' cut_point : '+str(cut_point_list[0][0]+1)+'  | value: '+str(acceleration[cut_point_list[0][0]]))
+    plt.title( para+' cut_point : '+str(cut_point_list[0][0]+1)+'  | value: '+str(acceleration[cut_point_list[0][0]])+' | ratio: '+ str(max_ratio)  )
     
     if _showImg['histogram']:
         plt.show()
     if _writeImg['histogram']:
-        plt.savefig(output_path+fileName[:-4]+'_scale['+str_scale+']_para['+para+']_his.jpg')    
-        
-    if ONE_group:
-        print 'all in one group!'
-        return [0]*len(cnt_list) 
+        plt.savefig(output_path+fileName[:-4]+'_scale['+str_scale+']_para['+para+']_his.png')    
+    plt.close()    
     
     #print 'acceleration.argmax():',acceleration.argmax()
     clusters = fcluster(cnt_hierarchy, max_d, criterion='distance')   
