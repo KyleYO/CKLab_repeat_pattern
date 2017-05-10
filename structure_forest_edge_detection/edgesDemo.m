@@ -35,7 +35,7 @@ for i=1:a
      I=imread(fullfile('../edge_input',outputdir(i).name)); 
 
 %tic
-     disp( [ strtok(outputdir(i).name,'.') '_edge.jpg'] );
+     disp( outputdir(i).name );
      E=edgesDetect(I,model);
 % time=[time toc]
 %      figure,imshow(I); 
@@ -48,7 +48,7 @@ for i=1:a
     
     
      imwrite(E,fullfile('../edge_output',[ strtok(outputdir(i).name,'.') '_edge.jpg']))
-     disp( [ strtok(outputdir(i).name,'.') '_edge.jpg'] );
+     disp( [i strtok(outputdir(i).name,'.') '_edge.jpg'] );
 %      imwrite(I2,[int2str(i) '_sobel_edge.jpg'])
 end
 disp('Finish!');
