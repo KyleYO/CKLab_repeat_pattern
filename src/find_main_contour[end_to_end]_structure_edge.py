@@ -29,30 +29,32 @@ switchColor = [(255,255,0),(255,0,255),(0,255,255),(255,0,0),(0,255,0),(255,128,
 resize_height = 736.0
 split_n_row = 16
 split_n_column = 16
-gaussian_para = 5
+gaussian_para = 3
 
 _sharpen = True
-_check_overlap = False
+_check_overlap = True
 _remove_high_density = True
 _remove_too_many_edge = True
 _checkConvex = False
+_gaussian_filter = True
 _use_structure_edge = True
-_gray_value_redistribution = True
+_enhance_edge = True
+_gray_value_redistribution_local = True
 
 
-input_path = '../../input_image/egg/'
+input_path = '../../input_image/brick/'
 #input_path = '../../input_animal/'
 edge_input_path = '../../edge_input/'
 output_path = '../../output_image/'
 
 
 _edge_by_channel = ['v','l']
-_showImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'each_group_result_contour':True, 'result_contour':True, 'result_max':True }
-_writeImg = { 'original_image':False, 'original_edge':True, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':True, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'each_group_result_contour':False, 'result_contour':False, 'result_max':False }
+_showImg = { 'original_image':True, 'original_edge':True, 'enhanced_edge':True, 'original_contour':True, 'contour_filtered':True, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'each_group_result_contour':True, 'result_contour':True, 'result_max':True }
+_writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'each_group_result_contour':False, 'result_contour':False, 'result_max':False }
 
 _show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
-test_one_img = { 'test':False , 'filename': 'egg (1).jpg' }
+test_one_img = { 'test':True , 'filename': 'brick (3).jpg' }
 
 def main():
      
@@ -102,45 +104,28 @@ def main():
             cv2.imshow( fileName + ' origianl_image', ShowResize(image_resi) )
             cv2.waitKey(0)
         if _writeImg['original_image']:
-            cv2.imwrite(output_path+fileName[:-4]+'_a.jpg', image_resi )        
+            cv2.imwrite(output_path+fileName[:-4]+'_a_original_image.jpg', image_resi )        
         
-        # read edge image 
-        edge_image_ori = cv2.imread( edge_input_path + fileName[:-4] + '_edge.jpg' , cv2.IMREAD_GRAYSCALE )
-        if _showImg['original_edge']:
-            cv2.imshow( fileName + ' origianl_edge', ShowResize(edge_image_ori) )
-            cv2.waitKey(0)
-        if _writeImg['original_edge']:
-            cv2.imwrite(output_path+fileName[:-4]+'_b_original_edge', edge_image_ori )        
-         
-        edge_image_resi = cv2.resize( edge_image_ori, (0,0), fx= resize_height/height, fy= resize_height/height)
+       
     
         for j in xrange(1):
                      
             if _use_structure_edge :
-                # enhance and close the edge
-                print 'Enhance edge'
-                if _gray_value_redistribution : 
-            
-                    gray_value_list = range(255,-1,-1)
-            
-                    for i in range(len(gray_value_list)):
-                        for a in range(9):
-                            gray_value_list[i] =  int( round( 255 - pow(gray_value_list[i],100)/pow(255.0,99) ) )
-            
-                    tmp_height, tmp_width = edge_image_ori.shape[:2]
-                    for h in range(tmp_height) :
-                        for w in range(tmp_width) :
-                            edge_image_ori[h,w] = gray_value_list[ edge_image_ori[h,w] ]     
-                else:
-                    edge_image_ori[ edge_image_ori > 10 ] = 255
+                            
+                # read edge image 
+                edge_image_ori = cv2.imread( edge_input_path + fileName[:-4] + '_edge.jpg' , cv2.IMREAD_GRAYSCALE )           
+                edged = cv2.resize( edge_image_ori, (0,0), fx= resize_height/height, fy= resize_height/height)                          
+                #thresh_gray,edged = cv2.threshold(edge_image_resi,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)   
                 
-                thresh_gray,edged = cv2.threshold(edge_image_resi,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)            
             else:
                 scale = 1.0/(2**j)
                 print 'Scale:', scale           
                 str_scale = '1_'+str(2**j)
-                image_resi = cv2.resize( image_resi, (0,0), fx= scale, fy= scale)        
-                image_resi = cv2.GaussianBlur(image_resi, (gaussian_para, gaussian_para),0)
+                image_resi = cv2.resize( image_resi, (0,0), fx= scale, fy= scale)   
+                
+                if _gaussian_filter :  
+                    print 'Gaussian filter'
+                    image_resi = cv2.GaussianBlur(image_resi, (gaussian_para, gaussian_para),0)
             
                 if _sharpen :
                     print 'Sharpening'
@@ -178,17 +163,49 @@ def main():
                 image_resi = cv2.resize( image_resi, (0,0), fx= 1.0/scale, fy= 1.0/scale)
                 edged = cv2.resize( edged, (0,0), fx= 1.0/scale, fy= 1.0/scale)                            
             # end detect edge else  
-         
-            if _showImg['enhanced_edge']:
-                cv2.imshow( fileName + ' enhanced_edge', ShowResize(edged) )
+  
+            if _showImg['original_edge']:
+                cv2.imshow( fileName + ' origianl_edge', ShowResize(edged) )
                 cv2.waitKey(0)
-            if _writeImg['enhanced_edge']:
-                cv2.imwrite( output_path + fileName[:-4] +'_enhanced_edge.jpg', edged )                  
+            if _writeImg['original_edge']:
+                cv2.imwrite(output_path+fileName[:-4]+'_b_original_edge.jpg', edged )                 
             
-            print 'Find countour'           
+            if _enhance_edge :
+                # enhance and close the edge
+                print 'Enhance edge'
+                if _gray_value_redistribution_local : 
+                    
+                    # create a CLAHE object (Arguments are optional).
+                    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                    edged = clahe.apply(edged)                    
+            
+                    #gray_value_list = range(255,-1,-1)
+            
+                    #for i in range(len(gray_value_list)):
+                        #for a in range(9):
+                            #gray_value_list[i] =  int( round( 255 - pow(gray_value_list[i],100)/pow(255.0,99) ) )
+            
+                    #tmp_height, tmp_width = edge_image_resi.shape[:2]
+                    #for h in range(tmp_height) :
+                        #for w in range(tmp_width) :
+                            #edge_image_resi[h,w] = gray_value_list[ edge_image_resi[h,w] ]     
+                else:
+                    print 'Equalization'
+                    edged = cv2.equalizeHist(edged)            
+                
+                if _showImg['enhanced_edge']:
+                    cv2.imshow( fileName + ' enhanced_edge', ShowResize(edged) )
+                    cv2.waitKey(0)
+                if _writeImg['enhanced_edge']:
+                    cv2.imwrite( output_path + fileName[:-4] +'_c_enhanced_edge.jpg', edged )                 
+            # end enhance edge if
+                             
+            print 'Find countour'     
+            edged = cv2.threshold(edged,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
             contours = cv2.findContours(edged,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)[-2]
             contour_image = np.zeros( image_resi.shape, np.uint8 )
             color_index = 0 
+            
             for c in contours :
                 COLOR = switchColor[ color_index % len(switchColor) ]     
                 color_index += 1
@@ -197,7 +214,9 @@ def main():
             if _showImg['original_contour']:
                 cv2.imshow( fileName + ' original_contour', ShowResize(contour_image) )
                 cv2.waitKey(0)  
-                
+            if _writeImg['original_contour']:
+                cv2.imwrite( output_path + fileName[:-4] +'_d_original_contour.jpg', contour_image )                 
+                   
             tmp_cnt_list = [contours[0]]
             tmp_cnt = contours[0]
             for c in contours[1:]:
@@ -209,16 +228,18 @@ def main():
             
             noise = 0  
             contour_list = []
+            re_height, re_width = image_resi.shape[:2]
             print 'Filter contour'
             print '------------------------'
             for c in contours:
             
+                # remove too small or too big contour
                 if len(c) < 30 or len(c) > (re_height+re_width)*2/3.0: 
                     continue        
                 
                 if _checkConvex :
                     # remove contour which is not Convex hull
-                    print 'Check convexhull'
+                    #print 'Check convexhull'
                     if not cv2.isContourConvex(np.array(c)):
                         contour_image = np.zeros( image_resi.shape, np.uint8 )
                         cv2.drawContours( contour_image, [c], -1, GREEN, 1 ) 
@@ -228,7 +249,7 @@ def main():
                 
                 if _remove_high_density :
                     # remove contour whose density is too large or like a line
-                    print 'Remove contour with high density'
+                    #print 'Remove contour with high density'
                     convexhull_area = cv2.contourArea(c) 
                     if convexhull_area == 0 or ( len(c) > 30 and float(len(c)) / convexhull_area > 0.5 ) or ( len(c) <= 30 and float(len(c)) / convexhull_area > 0.75 ): 
                         noise+=1
@@ -236,7 +257,7 @@ def main():
                 
                 if _remove_too_many_edge :
                     # remove contour which has too many edge
-                    print 'Remove contour with too many edges '
+                    #print 'Remove contour with too many edges '
                     peri = cv2.arcLength(c, True)
                     approx = cv2.approxPolyDP(c, 0.005 * peri, True)
                     #contour_image = np.zeros( image_resi.shape, np.uint8 )
@@ -272,7 +293,7 @@ def main():
                 cv2.imshow( fileName + ' contour_filtered', ShowResize(contour_image) )
                 cv2.waitKey(0)
             if _writeImg['contour_filtered']:
-                cv2.imwrite( output_path + fileName[:-4] +'_a_contour_filtered.jpg', contour_image )
+                cv2.imwrite( output_path + fileName[:-4] +'_e_contour_filtered.jpg', contour_image )
 
             print 'Extract contour feature'
             # Get contour feature
@@ -296,7 +317,7 @@ def main():
                 contour_feature_list =  feature_dic[para[para_index]]
                 
                 # hierarchical clustering
-                label_list = Hierarchical_clustering( contour_feature_list, fileName, para[para_index], str_scale )   
+                label_list = Hierarchical_clustering( contour_feature_list, fileName, para[para_index] )   
                 
                 unique_label, label_counts = np.unique(label_list, return_counts=True)
                 
@@ -317,7 +338,7 @@ def main():
                     cv2.imshow( 'cluster by :'+ para[para_index], ShowResize(contour_image) )
                     cv2.waitKey(0)
                 if _writeImg[para[para_index]]:
-                    cv2.imwrite( output_path + fileName[:-4] +'_para['+para[para_index]+'].jpg', contour_image ) 
+                    cv2.imwrite( output_path + fileName[:-4] +'_f_para['+para[para_index]+'].jpg', contour_image ) 
                 
                 label_list_dic[para[para_index]] = label_list
                 
@@ -366,12 +387,12 @@ def main():
                 contour_image_each = cv2.resize( contour_image_each, (0,0), fx = float(color_image_ori.shape[0])/contour_image_each.shape[0], fy = float(color_image_ori.shape[0])/contour_image_each.shape[0])
                 
                 if _showImg['each_group_result_contour']:
-                    if len(tmp_group) > 2 :
+                    if len(tmp_group) > 1 :
                         cv2.imshow(fileName+' | label:'+str(label)+' | count:'+str(len(tmp_group)), ShowResize(contour_image_each) )
                         cv2.waitKey(0)     
                 if _writeImg['each_group_result_contour']:
-                    if len(tmp_group) > 2 :
-                        cv2.imwrite( output_path + fileName[:-4] +'_label['+str(label)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )                 
+                    if len(tmp_group) > 1 :
+                        cv2.imwrite( output_path + fileName[:-4] +'_i_label['+str(label)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )                 
                 
             # end find final group for
             # sort the group from the max goup to min group and get max count
@@ -388,12 +409,12 @@ def main():
                 cv2.imshow(fileName+' final group ', ShowResize(contour_image) )
                 cv2.waitKey(0)     
             if _writeImg['result_contour']:
-                cv2.imwrite( output_path + fileName[:-4] +'_Count['+str(count)+'].jpg', combine_image ) 
+                cv2.imwrite( output_path + fileName[:-4] +'_g_Count['+str(count)+'].jpg', combine_image ) 
             if _showImg['result_max']:
                 cv2.imshow(fileName+' final max group | Count['+str(count)+']', ShowResize(contour_image_max) )
                 cv2.waitKey(0)     
             if _writeImg['result_max']:
-                cv2.imwrite( output_path + fileName[:-4] +'_Count['+str(count)+']_max.jpg', combine_image_max )                
+                cv2.imwrite( output_path + fileName[:-4] +'_h_Count['+str(count)+']_max.jpg', combine_image_max )                
               
             # append each scale result            
             each_scale_best_result.append( { 'filename':fileName, 'img':combine_image, 'count':count } )
@@ -531,7 +552,7 @@ def IsOverlapAll( cnt, cnt_list ):
 
 def SplitColorChannel( img ):
     
-    bgr_gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY) 
+    bgr_gray = cv2.cvtColor( img, cv2.COLOR_BGR2GRAY ) 
     bgr_gray = cv2.GaussianBlur(bgr_gray, (5, 5), 0)  
     thresh_bgr_gray = cv2.threshold(bgr_gray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[0]    
     
@@ -624,12 +645,13 @@ def GetMoment(cnt):
         
     return float(cx)/num, float(cy)/num
 
-def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method = 'elbow' ):
+def Hierarchical_clustering( feature_list, fileName, para, cut_method = 'elbow' ):
 
     if len(feature_list) < 2:
         return [0]*len(feature_list)
     
     # hierarchically link cnt by order of distance from distance method 'ward'
+    #print feature_list
     cnt_hierarchy = linkage( feature_list, 'ward')
     #cnt_hierarchy = linkage( feature_list)
     
@@ -641,6 +663,8 @@ def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method
         #print 'last:',last
         acceleration = np.diff(last) 
         
+        #acceleration = map(abs, np.diff(acceleration) )
+        
         #acceleration_rev = acceleration[::-1]
         #print 'acceleration:',acceleration 
         
@@ -649,8 +673,10 @@ def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method
         avg_diff = sum(acceleration)/float(len(acceleration))
         tmp = acceleration[0]
         
-       
-        off_set = 10
+        avg_list = [x for x in acceleration if x > avg_diff]
+        avg_diff = sum(avg_list)/float(len(avg_list))
+        
+        off_set = 5
         
         cut_point_list = []
         for i in xrange( 1,len(acceleration) ):
@@ -658,13 +684,13 @@ def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method
             if acceleration[i] > avg_diff:
                 #cut_point_list.append( [ i, acceleration[i]/(tmp/float(i) ) ] )
                 
-                tmp_offset = off_set
-                n = i - off_set
-                if n < 0 :
-                    n = 0
-                    tmp_offset = i-n
+                tmp_offset_prev = off_set
+                prev = i - off_set
+                if prev < 0 :
+                    prev = 0
+                    tmp_offset_prev = i-prev
                 
-                cut_point_list.append( [ i, acceleration[i]/( sum(acceleration[n:i]) / float(tmp_offset) ) ] )
+                cut_point_list.append( [ i, acceleration[i]/( sum(acceleration[prev:i]) / float(tmp_offset_prev) ) ] )
                 #print 'i:',i+1,' ratio:',acceleration[i]/( sum(acceleration[n:i]) / float(off_set) )
                 
             tmp += acceleration[i]
@@ -679,7 +705,7 @@ def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method
         max_d = last[cut_point_list[0][0]]
         max_ratio = cut_point_list[0][1]
         
-        if max_ratio < 5.0 :
+        if max_ratio < 2.0 :
             print 'all in one group! max_ratio:',max_ratio
             return [0]*len(feature_list)  
         
@@ -692,7 +718,7 @@ def Hierarchical_clustering( feature_list, fileName, para, str_scale, cut_method
     if _showImg['histogram']:
         plt.show()
     if _writeImg['histogram']:
-        plt.savefig(output_path+fileName[:-4]+'_scale['+str_scale+']_para['+para+']_his.png')    
+        plt.savefig(output_path+fileName[:-4]+'_f_para['+para+']_his.png')    
     plt.close()    
     
     #print 'acceleration.argmax():',acceleration.argmax()

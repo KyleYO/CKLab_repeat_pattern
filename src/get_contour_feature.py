@@ -14,7 +14,9 @@ PURPLE = (205,0,205)
 WHITE = (255,255,255)
 BLACK = (0,0,0)
 
-sample_number = 720
+sample_number = 360
+
+offset_index = 0
 
 def extract_feature( image, contours ):
     
@@ -52,17 +54,20 @@ def extract_feature( image, contours ):
         for c in contours[i]:
             #print c[0],(cx,cy),Eucl_distance(c[0],(cx,cy))
             
+            # the (0,0) in image is the left top point
             v1 = ( c[0][0]-cx, (cy-c[0][1]) )
             v2 = (0,height)
             
-            if (np.linalg.norm(v1) * np.linalg.norm(v2)) == 0:
+            if v1[0] == 0 and v1[1] >= 0 :
+                angle = 0.0
+            elif v1[0] == 0 and v1[1] < 0 :
                 angle = 180.0
             else:
                 angle = np.arccos( np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)) )
                 angle = angle*180/np.pi
                 
             if( v1[0] < 0 ):
-                angle = 180 - angle       
+                angle = 360 - angle       
            
             if Eucl_distance(c[0],(cx,cy)) > max_dis:
                 max_dis = Eucl_distance(c[0],(cx,cy))
@@ -77,8 +82,27 @@ def extract_feature( image, contours ):
         
         tmp_list = rotate_contour( tmp_list, ellipse[2])
         
-        c_list_d.append( sample_by_angle(tmp_list, sample_number) )
+        #img_copy = image.copy()
+        #draw_rotate_contours = np.array(list(contours[i][offset_index:]) + list(contours[i][:offset_index]))
+        #for c in draw_rotate_contours:
+            #cv2.drawContours(img_copy, [c], -1, (0,255,0), 3)
+            #cv2.imshow('img',img_copy)
+            #cv2.waitKey(5)     
+            
+        distance_list, coordinate_list = sample_by_angle(tmp_list, sample_number)
+        #if len(distance_list) != 360 :
+            #print 'len(distance_list):',len(distance_list)
+        c_list_d.append( distance_list )
         
+        #img_copy = image.copy()
+        #draw_rotate_contours = np.array(list(contours[i][offset_index:]) + list(contours[i][:offset_index]))
+        #for c in coordinate_list:
+            #cv2.drawContours(img_copy, [np.array([c])], -1, (0,255,0), 3)
+            #cv2.imshow('img',img_copy)
+            #cv2.waitKey(5)         
+        
+        #print sample_by_angle(tmp_list, sample_number) 
+    # end contour for
     cnt_rgb_list = []
     cnt_lab_list = []
     cnt_hsv_list = []
@@ -99,28 +123,65 @@ def extract_feature( image, contours ):
 
 def rotate_contour( contour_list, main_angle ):
     #print main_angle
-    min_value = 360
+  
     min_distance = 1000
     min_index = 0
+    angle_offset = 0
+    dis_0 = 1000
+    dis_180 = 1000
+    angle_0_dis = 0
+    angle_180_dis = 0
+    angle_0 = 0
+    angle_180 = 0
+    index_0 = 0
+    index_180 = 0
     
     for i in xrange( len(contour_list) ):
-        if abs(contour_list[i]['angle']-main_angle) < 1 and contour_list[i]['distance'] < min_distance :
-            min_value = abs(contour_list[i]['angle']-main_angle)
-            min_distance = contour_list[i]['distance']
-            min_index = i 
+        
+        if  abs( contour_list[i]['angle']-main_angle ) < dis_0 :
+            dis_0 = abs(contour_list[i]['angle']-main_angle )
+            angle_0_dis = contour_list[i]['distance']
+            index_0 = i
+            angle_0 = contour_list[i]['angle']
+        
+        if  abs( contour_list[i]['angle']-main_angle-180 ) < dis_180 :
+            dis_180 = abs(contour_list[i]['angle']-main_angle-180 )
+            angle_180_dis = contour_list[i]['distance']  
+            index_180 = i
+            angle_180 = contour_list[i]['angle']
+        
+        if angle_0_dis < angle_180_dis :
+            min_index = index_0
+            angle_offset = angle_0
+        else:
+            min_index = index_180
+            angle_offset = angle_180     
+        
+        offset_index = min_index
+        
+        #if ( abs(contour_list[i]['angle']-main_angle) < 1 or abs(contour_list[i]['angle']-main_angle-180) < 1 ) and contour_list[i]['distance'] < min_distance :  
+            #min_distance = contour_list[i]['distance']
+            #min_index = i 
+            #angle_offset = contour_list[i]['angle']
+            #offset_index = min_index
             
     rotate_list = contour_list[min_index:]+contour_list[:min_index]
     
-    n_180 = 0
-    offset = rotate_list[0]['angle']
-    tmp = offset
-    rotate_list[0]['angle']=0
+    for i in xrange( len(rotate_list) ):
+        rotate_list[i]['angle'] = rotate_list[i]['angle'] - angle_offset
+        if rotate_list[i]['angle'] < 0 :
+            rotate_list[i]['angle'] += 360
+    
+    #n_180 = 0
+    #offset = rotate_list[0]['angle']
+    #tmp = offset
+    #rotate_list[0]['angle']=0
    
-    for i in xrange( 1, len(rotate_list) ):
-        if tmp - rotate_list[i]['angle'] > 100 :
-            n_180+=1
-        tmp = rotate_list[i]['angle']
-        rotate_list[i]['angle'] = rotate_list[i]['angle']-offset+180*n_180
+    #for i in xrange( 1, len(rotate_list) ):
+        #if tmp - rotate_list[i]['angle'] > 100 :
+            #n_180+=1
+        #tmp = rotate_list[i]['angle']
+        #rotate_list[i]['angle'] = rotate_list[i]['angle']-offset+180*n_180
     
     return rotate_list 
 
@@ -137,32 +198,55 @@ def sample_by_angle( contour_list, n_sample ):
         #print angle
         index = -1
         deviation = 10
+        sample_angle = 0
+        sample_distance = 0
+        sample_coordinate = 0
+        
+        angle_match = False
         for i in xrange( tmp_i, len(contour_list) ):
+              
+            #if angle == 0:
+                #print "contour_list[i]['angle']:",contour_list[i]['angle'],"abs(contour_list[i]['angle']-angle):",abs(contour_list[i]['angle']-angle)
             #tmp_i = i
             #print "contour_list[i]['angle']",contour_list[i]['angle'],"angle",angle,"abs(contour_list[i]['angle']-angle)",abs(contour_list[i]['angle']-angle),"deviation",deviation
             if abs(contour_list[i]['angle']-angle) < angle_err and abs(contour_list[i]['angle']-angle) < deviation :
-                #print 'OK'
+                angle_match = True
                 deviation = abs(contour_list[i]['angle']-angle)
                 index = i
-            elif index >=0 :
-                sample_list.append( { 'distance':contour_list[i-1]['distance'], 'angle':contour_list[i-1]['angle'] } )
-                angle_hash.append(angle)
-                break
+                sample_angle = contour_list[i]['angle']
+                sample_distance = contour_list[i]['distance']                                
+                sample_coordinate = contour_list[i]['coordinate']
+                
+            #elif index >=0 :
+                #sample_list.append( { 'distance':contour_list[i-1]['distance'], 'angle':contour_list[i-1]['angle'] } )
+                #angle_hash.append(angle)
+                #break
+        if angle_match:
+            angle_hash.append(angle)
+            sample_list.append( { 'distance':sample_distance, 'angle':sample_angle, 'coordinate':sample_coordinate } )
+        # end contour_list for 
+    # end angle for
     
     distance_list = []
+    coordinate_list = []
     angle_hash.append(360.0)
-    sample_list.append( { 'distance':sample_list[0]['distance'] ,'angle':360.0 } )
+    sample_list.append( { 'distance':sample_list[0]['distance'], 'angle':360.0, 'coordinate':contour_list[0]['coordinate'] } )
     
+    # use interpolat to complete the sample angle distance
     for i in xrange( len(angle_hash)-1 ):
         distance_list.append( sample_list[i]['distance'] )
-        for sample_i in np.arange( angle_hash[i]+per_angle, angle_hash[i+1], per_angle ):
+        coordinate_list.append( sample_list[i]['coordinate'] )
+        #print 'out:',angle_hash[i]
+        for sample_i in np.arange( angle_hash[i]+per_angle, angle_hash[i+1], per_angle ):      
+            #print 'in:',sample_i
+            #print angle_hash[i],sample_list[i]['distance'],angle_hash[i+1],sample_list[i+1]['distance'],sample_i
+            #print Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], sample_i )
             distance_list.append( Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], sample_i ) )
-        
-    #print "len(angle_hash):",len(angle_hash)," | angle_hash:",angle_hash
-    #print "len(sample_list):",len(sample_list)," | sample_list:",sample_list
-    #print "len(distance_list):",len(distance_list)," | sample_list:",distance_list
-    
-    return distance_list
+            coordinate_list.append( Interpolation_coordinate( angle_hash[i], sample_list[i]['coordinate'], angle_hash[i+1], sample_list[i+1]['coordinate'], sample_i ) )
+    #if len(distance_list) != 360 :
+        #print distance_list
+    #print 'len(coordinate_list):',coordinate_list
+    return distance_list, coordinate_list
 
 def Eucl_distance(a,b):
     
@@ -175,7 +259,10 @@ def Eucl_distance(a,b):
 
 
 def Interpolation( a, a_d, b, b_d, i ):
-    return ( abs(i-a)*b_d + abs(b-i)*a_d ) / abs(b-a) 
+    return ( abs(i-a)*b_d + abs(b-i)*a_d ) / float(abs(b-a)) 
+
+def Interpolation_coordinate( a, a_d, b, b_d, i ):  
+    return np.array( [ int(round( a_d[0]+ (b_d[0]-a_d[0])*( float(i-a)/(b-a) ) )) , int(round( a_d[1] + (b_d[1]-a_d[1])*( float(i-a)/(b-a) ) ) ) ] )
 
 def FindCntAvgColorInetnsity( cnt, img ):
     
@@ -364,6 +451,7 @@ def FindCntAvgRGB( cnt, img ):
     return [ float(avg[0])/(num*255), float(avg[1])/(num*255), float(avg[2])/(num*255) ]
     #return [ float(avg[0])/(num), float(avg[1])/(num), float(avg[2])/(num) ]
        
+    
     
 #if __name__ == "__main__":
     #start = time.time()
