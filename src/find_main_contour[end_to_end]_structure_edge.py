@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import os 
 import time
+import csv
 import get_contour_feature
 import operator
 from operator import itemgetter
@@ -33,6 +34,7 @@ gaussian_para = 3
 
 _sharpen = True
 _check_overlap = True
+_remove_small_and_big = True
 _remove_high_density = True
 _remove_too_many_edge = True
 _checkConvex = False
@@ -40,21 +42,23 @@ _gaussian_filter = True
 _use_structure_edge = True
 _enhance_edge = True
 _gray_value_redistribution_local = True
+_record_by_csv = False
 
 
-input_path = '../../input_image/brick/'
+input_path = '../../input_image/wood/'
 #input_path = '../../input_animal/'
 edge_input_path = '../../edge_input/'
 output_path = '../../output_image/'
+csv_output = '../../output_csv/'
 
+_edge_by_channel = ['bgr_gray']
 
-_edge_by_channel = ['v','l']
-_showImg = { 'original_image':True, 'original_edge':True, 'enhanced_edge':True, 'original_contour':True, 'contour_filtered':True, 'size':True, 'shape':True, 'color':True, 'histogram':True , 'each_group_result_contour':True, 'result_contour':True, 'result_max':True }
+_showImg = { 'original_image':True, 'original_edge':True, 'enhanced_edge':True, 'original_contour':True, 'contour_filtered':True, 'size':False, 'shape':False, 'color':False, 'histogram':False , 'each_group_result_contour':True, 'result_contour':True, 'result_max':True }
 _writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'histogram':False, 'each_group_result_contour':False, 'result_contour':False, 'result_max':False }
 
 _show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
-test_one_img = { 'test':True , 'filename': 'brick (3).jpg' }
+test_one_img = { 'test':True , 'filename': 'wood (7).jpg' }
 
 def main():
      
@@ -170,7 +174,7 @@ def main():
             if _writeImg['original_edge']:
                 cv2.imwrite(output_path+fileName[:-4]+'_b_original_edge.jpg', edged )                 
             
-            if _enhance_edge :
+            if _enhance_edge and _use_structure_edge:
                 # enhance and close the edge
                 print 'Enhance edge'
                 if _gray_value_redistribution_local : 
@@ -233,9 +237,10 @@ def main():
             print '------------------------'
             for c in contours:
             
-                # remove too small or too big contour
-                if len(c) < 30 or len(c) > (re_height+re_width)*2/3.0: 
-                    continue        
+                if _remove_small_and_big :
+                    # remove too small or too big contour
+                    if len(c) < 30 or len(c) > (re_height+re_width)*2/3.0: 
+                        continue        
                 
                 if _checkConvex :
                     # remove contour which is not Convex hull
@@ -364,6 +369,7 @@ def main():
             color_index = 0             
             for label in unique_label :
                 contour_image_each = image_resi.copy()
+                # darken the image to make the contour visible
                 contour_image_each[:] = contour_image_each[:]/3.0
                 COLOR = switchColor[ color_index % len(switchColor) ]
                 color_index += 1
@@ -373,6 +379,10 @@ def main():
                         tmp_group.append( c_list[i] ) 
                 
                 tmp_group = CheckOverlap(tmp_group)
+                
+                tmp_area = 0.0
+                for cnt in tmp_group:
+                    tmp_area += cv2.contourArea(cnt)
 
                 if label == max_label :                  
                     cv2.drawContours( contour_image_max, np.array(tmp_group), -1, RED, 2 )
@@ -382,10 +392,47 @@ def main():
                 cv2.drawContours( contour_image, np.array(tmp_group), -1, COLOR, 2 )
                 cv2.drawContours( contour_image_each, np.array(tmp_group), -1, COLOR, 2 )
                 
-                final_group.append(tmp_group)
+                final_group.append( { 'cnt':tmp_group, 'area':tmp_area } )
                 
                 contour_image_each = cv2.resize( contour_image_each, (0,0), fx = float(color_image_ori.shape[0])/contour_image_each.shape[0], fy = float(color_image_ori.shape[0])/contour_image_each.shape[0])
                 
+                #if _showImg['each_group_result_contour']:
+                    #if len(tmp_group) > 1 :
+                        #cv2.imshow(fileName+' | label:'+str(label)+' | count:'+str(len(tmp_group)), ShowResize(contour_image_each) )
+                        #cv2.waitKey(0)     
+                #if _writeImg['each_group_result_contour']:
+                    #if len(tmp_group) > 1 :
+                        #cv2.imwrite( output_path + fileName[:-4] +'_i_label['+str(label)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )                 
+                
+            # end find final group for
+            # sort the group from the max area to min group and get max count
+            final_group.sort( key = lambda x:x['area'], reverse = True )
+            cv2.imshow(fileName+' final group ', ShowResize(contour_image) )
+            cv2.waitKey(0)   
+            contour_image[:] = BLACK
+            
+            obvious_index = 0
+            max_diff = 0
+            area_list = [ final_group[0]['area'] ]
+            for i in range( 1, len( final_group ) ):
+                area_list.append(final_group[i]['area'])
+                diff = final_group[i-1]['area'] - final_group[i]['area']
+                if diff > max_diff:
+                    max_diff = diff
+                    obvious_index = i
+            print 'area_list:',area_list
+            final_group = final_group[:obvious_index]
+            
+            for tmp_group in final_group:
+                tmp_group = tmp_group['cnt']
+                contour_image_each = image_resi.copy()
+                # darken the image to make the contour visible
+                contour_image_each[:] = contour_image_each[:]/3.0                
+                COLOR = switchColor[ color_index % len(switchColor) ]
+                color_index += 1                
+                cv2.drawContours( contour_image, np.array(tmp_group), -1, COLOR, 2 )
+                cv2.drawContours( contour_image_each, np.array(tmp_group), -1, COLOR, 2 )
+                                     
                 if _showImg['each_group_result_contour']:
                     if len(tmp_group) > 1 :
                         cv2.imshow(fileName+' | label:'+str(label)+' | count:'+str(len(tmp_group)), ShowResize(contour_image_each) )
@@ -393,10 +440,12 @@ def main():
                 if _writeImg['each_group_result_contour']:
                     if len(tmp_group) > 1 :
                         cv2.imwrite( output_path + fileName[:-4] +'_i_label['+str(label)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )                 
-                
-            # end find final group for
-            # sort the group from the max goup to min group and get max count
-            final_group.sort( key = lambda x:len(x), reverse = True )
+            cv2.imshow(fileName+' final group obvious', ShowResize(contour_image) )
+            cv2.waitKey(0)             
+            
+            if _record_by_csv:
+                Record_by_CSV( fileName, final_group, contour_image )
+            
             count = len( final_group[0] )  
             
             contour_image = cv2.resize( contour_image, (0,0), fx = height/resize_height, fy = height/resize_height)
@@ -441,6 +490,24 @@ def main():
     print 'img:', max_time_img ,' max_time:',max_time,'s'
     print 'img:', min_time_img ,'min_time:',min_time,'s'
         
+
+def Record_by_CSV( filename, cnt_list, contour_image ):
+    
+    coordinar_list = [ [ 'Group','Y','X' ] ]
+    img = contour_image.copy()
+    #img[:]=BLACK
+    # for each group
+    for group_i in range( len(cnt_list) ):
+        for cnt in cnt_list[group_i]:
+            x, y = GetMoment(cnt)
+            coordinar_list.append( [ group_i, int(y), int(x) ] )
+            cv2.circle(img,(int(y),int(x)),2,(0,0,255),2)
+    #cv2.imshow('coordinate: '+str(x)+','+str(y),img)
+    #cv2.waitKey(0)
+    f = open(csv_output+filename[:-4]+'.csv',"wb")
+    w = csv.writer(f)
+    w.writerows(coordinar_list)
+    f.close()       
     
 def Sharpen(img):
     
@@ -461,7 +528,7 @@ def Eucl_distance(a,b):
     
     return np.linalg.norm(a-b) 
 
-def draw_image( image_resi, c_list, label_list, max_label ):
+def Draw_image( image_resi, c_list, label_list, max_label ):
     
     if type(label_list) != np.ndarray :
         label_list = np.array(label_list)
