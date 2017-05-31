@@ -20,11 +20,11 @@ offset_index = 0
 
 def extract_feature( image, contours ):
     
-    
+       
     height, width, channel = image.shape
-     
 
     c_list_d = []
+    cnt_color_gradient_list = []
     c_list = []
     min_contour_len = len(contours[0])
     
@@ -50,12 +50,14 @@ def extract_feature( image, contours ):
         cy = (M['m01']/M['m00'])
         
         max_dis = 0
+        img = image.copy()
+               
        
         for c in contours[i]:
             #print c[0],(cx,cy),Eucl_distance(c[0],(cx,cy))
             
             # the (0,0) in image is the left top point
-            v1 = ( c[0][0]-cx, (cy-c[0][1]) )
+            v1 = ( c[0][1]-cy , cx-c[0][0]  )
             v2 = (0,height)
             
             if v1[0] == 0 and v1[1] >= 0 :
@@ -80,8 +82,10 @@ def extract_feature( image, contours ):
             
         ellipse = cv2.fitEllipse(contours[i])     
         
-        tmp_list = rotate_contour( tmp_list, ellipse[2])
+     
         
+        tmp_list = rotate_contour( tmp_list, ellipse[2])
+       
         #img_copy = image.copy()
         #draw_rotate_contours = np.array(list(contours[i][offset_index:]) + list(contours[i][:offset_index]))
         #for c in draw_rotate_contours:
@@ -89,11 +93,11 @@ def extract_feature( image, contours ):
             #cv2.imshow('img',img_copy)
             #cv2.waitKey(5)     
             
-        distance_list, coordinate_list = sample_by_angle(tmp_list, sample_number)
+        distance_list, coordinate_list, cnt_color_gradient = sample_by_angle( image, tmp_list, sample_number )
         #if len(distance_list) != 360 :
             #print 'len(distance_list):',len(distance_list)
         c_list_d.append( distance_list )
-        
+        cnt_color_gradient_list.append( cnt_color_gradient )
         #img_copy = image.copy()
         #draw_rotate_contours = np.array(list(contours[i][offset_index:]) + list(contours[i][:offset_index]))
         #for c in coordinate_list:
@@ -118,7 +122,7 @@ def extract_feature( image, contours ):
         size_list.append( [len(cnt)/float(max_size)] )
         #size_list.append( [len(cnt)] )
     #print 'cor err:',cor    
-    return  c_list, c_list_d, cnt_intensity_list, size_list
+    return  c_list, c_list_d, cnt_intensity_list, size_list, cnt_color_gradient_list
 
 
 def rotate_contour( contour_list, main_angle ):
@@ -185,7 +189,7 @@ def rotate_contour( contour_list, main_angle ):
     
     return rotate_list 
 
-def sample_by_angle( contour_list, n_sample ):
+def sample_by_angle( img, contour_list, n_sample ):
     
     angle_hash = []
     sample_list = []
@@ -232,22 +236,89 @@ def sample_by_angle( contour_list, n_sample ):
     angle_hash.append(360.0)
     sample_list.append( { 'distance':sample_list[0]['distance'], 'angle':360.0, 'coordinate':contour_list[0]['coordinate'] } )
     
+    cnt_color_gradient = 0.0
+    
     # use interpolat to complete the sample angle distance
     for i in xrange( len(angle_hash)-1 ):
         distance_list.append( sample_list[i]['distance'] )
         coordinate_list.append( sample_list[i]['coordinate'] )
+        
+        cnt_color_gradient += Color_distance_by_angle( img, sample_list[i]['coordinate'], angle_hash[i] )
+        
         #print 'out:',angle_hash[i]
-        for sample_i in np.arange( angle_hash[i]+per_angle, angle_hash[i+1], per_angle ):      
-            #print 'in:',sample_i
-            #print angle_hash[i],sample_list[i]['distance'],angle_hash[i+1],sample_list[i+1]['distance'],sample_i
-            #print Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], sample_i )
-            distance_list.append( Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], sample_i ) )
-            coordinate_list.append( Interpolation_coordinate( angle_hash[i], sample_list[i]['coordinate'], angle_hash[i+1], sample_list[i+1]['coordinate'], sample_i ) )
+        for inter_angle in np.arange( angle_hash[i]+per_angle, angle_hash[i+1], per_angle ):      
+            #print 'in:',inter_angle
+            #print angle_hash[i],sample_list[i]['distance'],angle_hash[i+1],sample_list[i+1]['distance'],inter_angle
+            #print Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], inter_angle )
+            distance_list.append( Interpolation( angle_hash[i], sample_list[i]['distance'], angle_hash[i+1], sample_list[i+1]['distance'], inter_angle ) )
+            
+            Inter_coordinate = Interpolation_coordinate( angle_hash[i], sample_list[i]['coordinate'], angle_hash[i+1], sample_list[i+1]['coordinate'], inter_angle )
+          
+            coordinate_list.append( Inter_coordinate )
+            cnt_color_gradient += Color_distance_by_angle( img, Inter_coordinate, inter_angle )
+            
     #if len(distance_list) != 360 :
         #print distance_list
     #print 'len(coordinate_list):',coordinate_list
-    return distance_list, coordinate_list
+    return distance_list, coordinate_list, cnt_color_gradient/360.0
 
+def Color_distance_by_angle( img, coordinate, angle, modle = 'lab' ):
+    
+    if modle == 'lab':
+        img_lab = cv2.cvtColor( img, cv2.COLOR_BGR2LAB )
+        img_l = img_lab[:,:,0]
+        img_a = img_lab[:,:,1]
+        img_b = img_lab[:,:,2]
+        
+        coordinate_A = [0,0]
+        coordinate_B = [0,0]
+        
+        if ( angle >= 0 and angle < 15 ) or ( angle >= 345 ) or ( angle >= 165 and angle < 195 ) :
+            coordinate_A = [ coordinate[0], coordinate[1]-2 ]
+            coordinate_B = [ coordinate[0], coordinate[1]+2 ]            
+        elif ( angle >= 15 and angle < 38 ) or ( angle >= 195 and angle < 218 ) :
+            coordinate_A = [ coordinate[0]+1, coordinate[1]-2 ]
+            coordinate_B = [ coordinate[0]-1, coordinate[1]+2 ] 
+        elif ( angle >= 38 and angle < 53 ) or ( angle >= 218 and angle < 233 ) :
+            coordinate_A = [ coordinate[0]+2, coordinate[1]-2 ]
+            coordinate_B = [ coordinate[0]-2, coordinate[1]+2 ]             
+        elif ( angle >= 53 and angle < 75 ) or ( angle >= 233 and angle < 255 ) :
+            coordinate_A = [ coordinate[0]+2, coordinate[1]-1 ]
+            coordinate_B = [ coordinate[0]-2, coordinate[1]+1 ]             
+        elif ( angle >= 75 and angle < 105 ) or ( angle >= 255 and angle < 285 ) :
+            coordinate_A = [ coordinate[0]+2, coordinate[1] ]
+            coordinate_B = [ coordinate[0]-2, coordinate[1] ]             
+        elif ( angle >= 105 and angle < 128 ) or ( angle >= 285 and angle < 308 ) :
+            coordinate_A = [ coordinate[0]+2, coordinate[1]+1 ]
+            coordinate_B = [ coordinate[0]-2, coordinate[1]-1 ]             
+        elif ( angle >= 128 and angle < 143 ) or ( angle >= 308 and angle < 323 ) :
+            coordinate_A = [ coordinate[0]+2, coordinate[1]+2 ]
+            coordinate_B = [ coordinate[0]-2, coordinate[1]-2 ]             
+        elif ( angle >= 143 and angle < 165 ) or ( angle >= 323 and angle < 345 ) :
+            coordinate_A = [ coordinate[0]+1, coordinate[1]+2 ]
+            coordinate_B = [ coordinate[0]-1, coordinate[1]-2 ] 
+        
+        height, width = img.shape[:2]
+        coordinate_A[0] = max(coordinate_A[0],0)
+        coordinate_A[1] = max(coordinate_A[1],0)
+        coordinate_B[0] = max(coordinate_B[0],0)
+        coordinate_B[1] = max(coordinate_B[1],0) 
+        coordinate_A[0] = min(coordinate_A[0],width-1)
+        coordinate_A[1] = min(coordinate_A[1],height-1)
+        coordinate_B[0] = min(coordinate_B[0],width-1)
+        coordinate_B[1] = min(coordinate_B[1],height-1)        
+        
+        # (x,y) x for height, y for width
+        point_A_l_value = float(img_l[coordinate_A[1],coordinate_A[0]])
+        point_A_a_value = float(img_a[coordinate_A[1],coordinate_A[0]])
+        point_A_b_value = float(img_b[coordinate_A[1],coordinate_A[0]])
+        point_B_l_value = float(img_l[coordinate_B[1],coordinate_B[0]])
+        point_B_a_value = float(img_a[coordinate_B[1],coordinate_B[0]])
+        point_B_b_value = float(img_b[coordinate_B[1],coordinate_B[0]])        
+        
+        return math.sqrt( pow( abs( point_A_l_value - point_B_l_value ) , 2 ) + pow( abs( point_A_a_value - point_B_a_value ), 2 ) + pow( abs( point_A_b_value - point_B_b_value ), 2 ) )
+            
+            
 def Eucl_distance(a,b):
     
     if type(a) != np.ndarray :
@@ -256,7 +327,6 @@ def Eucl_distance(a,b):
         b = np.array(b)
     
     return np.linalg.norm(a-b)  
-
 
 def Interpolation( a, a_d, b, b_d, i ):
     return ( abs(i-a)*b_d + abs(b-i)*a_d ) / float(abs(b-a)) 

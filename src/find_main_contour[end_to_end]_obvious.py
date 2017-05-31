@@ -61,7 +61,7 @@ _writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':Fal
 
 _show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
-test_one_img = { 'test':True , 'filename': 'bean (15).jpg' }
+test_one_img = { 'test':True , 'filename': 'animal (4).jpg' }
 #test_one_img = { 'test':True , 'filename': '13_82.png' }
 
 def main():
@@ -437,9 +437,7 @@ def main():
                 final_group.append( { 'cnt':tmp_cnt_group, 'cover_area':tmp_area, 'color_gradient':avg_color_gradient, 'shape_factor':avg_shape_factor, 'obvious_weight':0, 'combine_weight':0.0 } )
                 
                 contour_image_each = cv2.resize( contour_image_each, (0,0), fx = float(color_image_ori.shape[0])/contour_image_each.shape[0], fy = float(color_image_ori.shape[0])/contour_image_each.shape[0])
-                #print 'shape_factor:',avg_shape_factor
-                #cv2.imshow(fileName+' shape_factor['+str(avg_shape_factor)+']', ShowResize(contour_image_each) )
-                #cv2.waitKey(0)                
+                
             # end find final group for
             # sort the group from the max area to min group and get max count
            
@@ -477,8 +475,6 @@ def main():
                         final_group[i]['combine_weight'] += final_group[i][obvious_para]/float(final_group[0][obvious_para])
                     
                     if 0.8*final_group[i-1][obvious_para] > final_group[i][obvious_para] and diff > max_diff:
-                        if obvious_para == 'cover_area' and 0.5*final_group[i-1][obvious_para] < final_group[i][obvious_para] :
-                            continue
                         max_diff = diff
                         obvious_index = i-1
                    
