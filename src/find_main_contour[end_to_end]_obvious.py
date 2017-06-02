@@ -56,13 +56,13 @@ csv_output = '../../output_csv_5_30[obvious]/'
 
 _edge_by_channel = ['bgr_gray']
 
-_showImg = { 'original_image':True, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':True, 'shape':True, 'color':True, 'cluster_histogram':True , 'original_result':True, 'each_obvious_result':True, 'combine_obvious_result':True, 'obvious_histogram':False, 'each_group_result':True, 'result_obvious':True }
-_writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'cluster_histogram':False, 'original_result':False, 'each_obvious_result':False, 'combine_obvious_result':False, 'obvious_histogram':False, 'each_group_result':False, 'result_obvious':False }
+_showImg = { 'original_image':True, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'cluster_histogram':False , 'original_result':True, 'each_obvious_result':True, 'combine_obvious_result':True, 'obvious_histogram':False, 'each_group_result':True, 'result_obvious':True, 'final_each_group_result':True, 'final_result':True }
+_writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'cluster_histogram':False, 'original_result':False, 'each_obvious_result':False, 'combine_obvious_result':False, 'obvious_histogram':False, 'each_group_result':False, 'result_obvious':False, 'final_each_group_result':False, 'final_result':False }
 
 _show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
-#test_one_img = { 'test':True , 'filename': 'pipe (20).jpg' }
-test_one_img = { 'test':True , 'filename': '12_282.png' }
+test_one_img = { 'test':True , 'filename': 'pipe (13).jpg' }
+#test_one_img = { 'test':True , 'filename': '6_264.png' }
 
 def main():
      
@@ -245,11 +245,22 @@ def main():
             re_height, re_width = image_resi.shape[:2]
             print 'Filter contour'
             print '------------------------'
+            
+            small_cnt_count = 0
+            for c in contours:
+                if len(c) < 30 :
+                    small_cnt_count += 1
+                
+            if small_cnt_count > 500 :
+                cnt_min_size = 30
+            else:
+                cnt_min_size = 4
+                
             for c in contours:
             
                 if _remove_small_and_big :
                     # remove too small or too big contour
-                    if len(c) < 30 or len(c) > (re_height+re_width)*2/3.0: 
+                    if len(c) < cnt_min_size or len(c) > (re_height+re_width)*2/3.0: 
                         continue        
                 
                 if _checkConvex :
@@ -459,16 +470,16 @@ def main():
                 continue
         
             #====================================================================================
-            for f_edge_group in final_group:
-                final_differ_edge_group.append(f_edge_group)
+            #for f_edge_group in final_group:
+                #final_differ_edge_group.append(f_edge_group)
             
-            if not _use_structure_edge :
-                _use_structure_edge = True
-                continue
+            #if not _use_structure_edge :
+                #_use_structure_edge = True
+                #continue
             
-            final_group = final_differ_edge_group
+            #final_group = final_differ_edge_group
              #====================================================================================
-             
+            
             obvious_list = ['cover_area','color_gradient','shape_factor']
             #sort final cnt group by cover_area , shape_factor and color_gradient
             for obvious_para in obvious_list:
@@ -521,18 +532,18 @@ def main():
                     cv2.drawContours( contour_image, np.array(final_group[i]['cnt']), -1, RED, 2 )  
                     
                 if _showImg['each_obvious_result']:
-                    cv2.imshow(fileName+' obvious_para:['+obvious_para+'] | Green for obvious', ShowResize(contour_image) )
+                    cv2.imshow(fileName+' obvious_para:['+obvious_para+'] | Green for obvious['+str(edge_type)+']', ShowResize(contour_image) )
                     cv2.waitKey(0)     
                 if _writeImg['each_obvious_result']:
-                    cv2.imwrite( output_path + fileName[:-4] +'_h_para['+obvious_para+']_obvious(Green).jpg', contour_image )   
+                    cv2.imwrite( output_path + fileName[:-4] +'_h_para['+obvious_para+']_obvious(Green)['+str(edge_type)+'].jpg', contour_image )   
                 
                 plt.bar(left=range(len(area_list)),height=area_list)   
-                plt.title( obvious_para+' cut_point : '+str(obvious_index)+'  | value: '+str(final_group[obvious_index][obvious_para]) )
+                plt.title( obvious_para+' cut_point : '+str(obvious_index)+'  | value: '+str(final_group[obvious_index][obvious_para] + '  |['+str(edge_type)+']') )
                        
                 if _showImg['obvious_histogram']:
                     plt.show()
                 if _writeImg['obvious_histogram']:
-                    plt.savefig(output_path+fileName[:-4]+'_h_para['+obvious_para+']_obvious_his.png')    
+                    plt.savefig(output_path+fileName[:-4]+'_h_para['+obvious_para+']_obvious_his['+str(edge_type)+'].png')    
                 plt.close()  
                 
                 if obvious_para == 'color_gradient':
@@ -598,7 +609,8 @@ def main():
            
             #-------------------------------------------------------------------------------------
             final_group_cnt = []
-            contour_image[:] = BLACK
+            contour_image = image_resi.copy()
+            contour_image[:] = contour_image[:]/3.0
             for tmp_group in final_obvious_group:
                 tmp_group = tmp_group['cnt']
                 
@@ -615,27 +627,93 @@ def main():
                 cv2.drawContours( contour_image_each, np.array(tmp_group), -1, COLOR, 2 )
     
                 if _showImg['each_group_result']:            
-                        cv2.imshow(fileName+' each_group_result', ShowResize(contour_image_each) )
+                        cv2.imshow(fileName+' each_group_result_label['+str(color_index)+']_Count['+str(len(tmp_group))+']_['+str(edge_type)+']', ShowResize(contour_image_each) )
                         cv2.waitKey(0)     
                 if _writeImg['each_group_result']:
-                        cv2.imwrite( output_path + fileName[:-4] +'_i_label['+str(color_index)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )  
+                        cv2.imwrite( output_path + fileName[:-4] +'_i_label['+str(color_index)+']_Count['+str(len(tmp_group))+']_['+str(edge_type)+'].jpg', contour_image_each )  
     
     
             contour_image = cv2.resize( contour_image, (0,0), fx = height/resize_height, fy = height/resize_height)
             combine_image = np.concatenate((color_image_ori, contour_image), axis=1) 
     
             if _showImg['result_obvious']:
-                cv2.imshow(fileName+' result_obvious', ShowResize(combine_image) )
+                cv2.imshow(fileName+' result_obvious['+str(edge_type)+']', ShowResize(combine_image) )
                 cv2.waitKey(0)     
             if _writeImg['result_obvious']:
-                cv2.imwrite( output_path + fileName[:-4] +'_j_result_obvious.jpg', combine_image )            
+                cv2.imwrite( output_path + fileName[:-4] +'_j_result_obvious['+str(edge_type)+'].jpg', combine_image )            
     
     
             if _record_by_csv:
                 Record_by_CSV( fileName, final_group_cnt, contour_image )
 
+
+
+            for f_group in final_obvious_group :
+                final_differ_edge_group.append(f_group)
+                        
+            if _use_structure_edge :
+                _use_structure_edge = False
+            else:
+                _use_structure_edge = True
+                
            
         #end scale for
+        
+        final_nonoverlap_cnt_group = []
+        compare_overlap_queue = []
+        total_group_number = len( final_differ_edge_group )
+        # get all group cnt and filter overlap 
+        for group_index in range( total_group_number ) :
+            cnt_group = final_differ_edge_group[group_index]['group_dic']
+            
+            for cnt_dic in cnt_group:
+                compare_overlap_queue.append( { 'cnt':cnt_dic['cnt'], 'label':group_index, 'group_weight':len(cnt_group)  } )
+        
+        compare_overlap_queue = CheckOverlap( compare_overlap_queue, keep = 'group_weight' )
+        
+        for label_i in range( total_group_number ) :
+            tmp_group = []
+            
+            for cnt_dic in compare_overlap_queue:
+                if cnt_dic['label'] == label_i : 
+                    tmp_group.append( cnt_dic['cnt'] )
+                    
+            final_nonoverlap_cnt_group.append(tmp_group)
+        
+        # draw final result
+        contour_image = image_resi.copy()
+        contour_image[:] = contour_image[:]/3.0
+        for tmp_group in final_nonoverlap_cnt_group:
+           
+            if len(tmp_group) < 2 :
+                continue
+            
+            contour_image_each = image_resi.copy()
+            # darken the image to make the contour visible
+            contour_image_each[:] = contour_image_each[:]/3.0                
+            COLOR = switchColor[ color_index % len(switchColor) ]
+            color_index += 1                
+            cv2.drawContours( contour_image, np.array(tmp_group), -1, COLOR, 2 )
+            cv2.drawContours( contour_image_each, np.array(tmp_group), -1, COLOR, 2 )
+
+            if _showImg['final_each_group_result']:            
+                    cv2.imshow(fileName+' each_group_result_label['+str(color_index)+']_Count['+str(len(tmp_group))+']', ShowResize(contour_image_each) )
+                    cv2.waitKey(0)     
+            if _writeImg['final_each_group_result']:
+                    cv2.imwrite( output_path + fileName[:-4] +'_k_label['+str(color_index)+']_Count['+str(len(tmp_group))+'].jpg', contour_image_each )  
+
+
+        contour_image = cv2.resize( contour_image, (0,0), fx = height/resize_height, fy = height/resize_height)
+        combine_image = np.concatenate((color_image_ori, contour_image), axis=1) 
+
+        if _showImg['final_result']:
+            cv2.imshow(fileName+' result_obvious', ShowResize(combine_image) )
+            cv2.waitKey(0)     
+        if _writeImg['final_result']:
+            cv2.imwrite( output_path + fileName[:-4] +'_l_result_obvious.jpg', combine_image )            
+        
+        
+        
         print 'Finished in ',time.time()-start_time,' s'
         #for img_tuple in each_scale_best_result:
             #print '--------------------------------------------------'
@@ -906,19 +984,43 @@ def Draw_image( image_resi, c_list, label_list, max_label ):
     combine_image = np.concatenate((image, contour_image), axis=1)      
     return combine_image, count_loss
 
-def CheckOverlap( cnt_dic_list ):
+def CheckOverlap( cnt_dic_list, keep = 'keep_inner' ):
     
     if cnt_dic_list == []:
         return []
     
     checked_list = []
-    # sort list from little to large
-    cnt_dic_list.sort( key = lambda x: len(x['cnt']) , reverse = False)
     
-    for c_dic in cnt_dic_list  : 
-        if IsOverlapAll( c_dic, checked_list ) : 
-            continue               
-        checked_list.append(c_dic) 
+    if keep == 'group_weight':
+        
+        for cnt_i in range( len(cnt_dic_list)-1 ):
+            for cnt_k in range( cnt_i+1, len(cnt_dic_list) ):
+                if cnt_dic_list[cnt_i]['group_weight'] > 0 and cnt_dic_list[cnt_k]['group_weight'] > 0 :
+                    if IsOverlap(cnt_dic_list[cnt_i]['cnt'], cnt_dic_list[cnt_k]['cnt']):
+                        if cnt_dic_list[cnt_i]['group_weight'] > cnt_dic_list[cnt_k]['group_weight']:
+                            cnt_dic_list[cnt_k]['group_weight'] = 0
+                        else:
+                            cnt_dic_list[cnt_i]['group_weight'] = 0
+        
+        for cnt_dic in cnt_dic_list:
+            if cnt_dic['group_weight'] > 0:
+                checked_list.append(cnt_dic)
+        
+    else:
+        
+        if keep == 'keep_inner':
+            # sort list from little to large
+            cnt_dic_list.sort( key = lambda x: len(x['cnt']) , reverse = False)
+            
+        elif keep == 'keep_outer':
+            cnt_dic_list.sort( key = lambda x: len(x['cnt']) , reverse = True)
+        
+        for c_dic in cnt_dic_list  : 
+            if IsOverlapAll( c_dic, checked_list ) : 
+                continue               
+            checked_list.append(c_dic) 
+    
+    # end keep if
     
     return checked_list
         
@@ -1121,7 +1223,11 @@ def Hierarchical_clustering( feature_list, fileName, para, cut_method = 'elbow' 
     if _showImg['cluster_histogram']:
         plt.show()
     if _writeImg['cluster_histogram']:
-        plt.savefig(output_path+fileName[:-4]+'_f_para['+para+']_his.png')    
+        if _use_structure_edge:
+            edge_type = 'structure'
+        else:
+            edge_type = 'canny'
+        plt.savefig(output_path+fileName[:-4]+'_f_para['+para+']_his['+str(edge_type)+'].png')    
     plt.close()    
     
     #print 'acceleration.argmax():',acceleration.argmax()
