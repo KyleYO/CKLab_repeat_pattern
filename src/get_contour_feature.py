@@ -364,7 +364,7 @@ def FindCntAvgColorInetnsity( cnt, img ):
     intensity = math.sqrt( pow(avg_lab[1],2) + pow(avg_lab[2],2)  )
     
     #return intensity
-    return avg_lab[:]
+    return avg_lab[0:]
 
 def FindCntHsvHis( cnt, img ):
     

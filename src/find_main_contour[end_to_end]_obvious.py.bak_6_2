@@ -30,8 +30,8 @@ switchColor = [(255,255,0),(255,0,255),(0,255,255),(255,0,0),(0,255,0),(255,128,
 
 
 resize_height = 736.0
-split_n_row = 1
-split_n_column = 1
+split_n_row = 16
+split_n_column = 16
 gaussian_para = 3
 
 _sharpen = True
@@ -41,7 +41,7 @@ _remove_high_density = True
 _remove_too_many_edge = True
 _checkConvex = False
 _gaussian_filter = True
-_use_structure_edge = False
+_use_structure_edge = True
 _enhance_edge = True
 _gray_value_redistribution_local = True
 _record_by_csv = False
@@ -56,13 +56,13 @@ csv_output = '../../output_csv_5_30[obvious]/'
 
 _edge_by_channel = ['bgr_gray']
 
-_showImg = { 'original_image':True, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':True, 'shape':True, 'color':True, 'cluster_histogram':True , 'original_result':True, 'each_obvious_result':True, 'combine_obvious_result':True, 'obvious_histogram':False, 'each_group_result':True, 'result_obvious':True }
+_showImg = { 'original_image':True, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'cluster_histogram':False , 'original_result':False, 'each_obvious_result':True, 'combine_obvious_result':True, 'obvious_histogram':False, 'each_group_result':True, 'result_obvious':True }
 _writeImg = { 'original_image':False, 'original_edge':False, 'enhanced_edge':False, 'original_contour':False, 'contour_filtered':False, 'size':False, 'shape':False, 'color':False, 'cluster_histogram':False, 'original_result':False, 'each_obvious_result':False, 'combine_obvious_result':False, 'obvious_histogram':False, 'each_group_result':False, 'result_obvious':False }
 
 _show_resize = [ ( 720, 'height' ), ( 1200, 'width' ) ][0]
 
 #test_one_img = { 'test':True , 'filename': 'pipe (20).jpg' }
-test_one_img = { 'test':True , 'filename': '12_282.png' }
+test_one_img = { 'test':True , 'filename': '9_214.png' }
 
 def main():
      
@@ -113,13 +113,9 @@ def main():
             cv2.waitKey(0)
         if _writeImg['original_image']:
             cv2.imwrite(output_path+fileName[:-4]+'_a_original_image.jpg', image_resi )        
-        #===========================
-        _use_structure_edge = False
-        #============================
-        final_differ_edge_group = []
-        for j in xrange(2):
-            
-            edge_type = 'structure'
+    
+      
+        for j in xrange(1):
                      
             if _use_structure_edge :
                             
@@ -130,8 +126,6 @@ def main():
                 #thresh_gray,edged = cv2.threshold(edge_image_resi,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)   
                 
             else:
-                edge_type = 'canny'
-                j = 0
                 scale = 1.0/(2**j)
                 print 'Scale:', scale           
                 str_scale = '1_'+str(2**j)
@@ -179,10 +173,10 @@ def main():
             # end detect edge else  
   
             if _showImg['original_edge']:
-                cv2.imshow( fileName + ' origianl_edge['+str(edge_type)+']', ShowResize(edged) )
+                cv2.imshow( fileName + ' origianl_edge', ShowResize(edged) )
                 cv2.waitKey(0)
             if _writeImg['original_edge']:
-                cv2.imwrite(output_path+fileName[:-4]+'_b_original_edge['+str(edge_type)+'].jpg', edged )                 
+                cv2.imwrite(output_path+fileName[:-4]+'_b_original_edge.jpg', edged )                 
             
             if _enhance_edge and _use_structure_edge:
                 # enhance and close the edge
@@ -208,10 +202,10 @@ def main():
                     edged = cv2.equalizeHist(edged)            
                 
                 if _showImg['enhanced_edge']:
-                    cv2.imshow( fileName + ' enhanced_edge['+str(edge_type)+']', ShowResize(edged) )
+                    cv2.imshow( fileName + ' enhanced_edge', ShowResize(edged) )
                     cv2.waitKey(0)
                 if _writeImg['enhanced_edge']:
-                    cv2.imwrite( output_path + fileName[:-4] +'_c_enhanced_edge['+str(edge_type)+'].jpg', edged )                 
+                    cv2.imwrite( output_path + fileName[:-4] +'_c_enhanced_edge.jpg', edged )                 
             # end enhance edge if
                            
             print 'Find countour'     
@@ -226,10 +220,10 @@ def main():
                 cv2.drawContours( contour_image, [c], -1, COLOR, 1 )            
             
             if _showImg['original_contour']:
-                cv2.imshow( fileName + ' original_contour['+str(edge_type)+']', ShowResize(contour_image) )
+                cv2.imshow( fileName + ' original_contour', ShowResize(contour_image) )
                 cv2.waitKey(0)  
             if _writeImg['original_contour']:
-                cv2.imwrite( output_path + fileName[:-4] +'_d_original_contour['+str(edge_type)+'].jpg', contour_image )                 
+                cv2.imwrite( output_path + fileName[:-4] +'_d_original_contour.jpg', contour_image )                 
                    
             tmp_cnt_list = [contours[0]]
             tmp_cnt = contours[0]
@@ -322,10 +316,10 @@ def main():
             #cv2.waitKey(0)
     
             if _showImg['contour_filtered']:
-                cv2.imshow( fileName + ' contour_filtered['+str(edge_type)+']', ShowResize(contour_image) )
+                cv2.imshow( fileName + ' contour_filtered', ShowResize(contour_image) )
                 cv2.waitKey(0)
             if _writeImg['contour_filtered']:
-                cv2.imwrite( output_path + fileName[:-4] +'_e_contour_filtered['+str(edge_type)+'].jpg', contour_image )
+                cv2.imwrite( output_path + fileName[:-4] +'_e_contour_filtered.jpg', contour_image )
 
             print 'Extract contour feature'
             # Get contour feature
@@ -371,10 +365,10 @@ def main():
                     cv2.drawContours( contour_image, np.array(tmp_splited_group), -1, COLOR, 2 )
                 
                 if _showImg[para[para_index]]:
-                    cv2.imshow( 'cluster by :'+ para[para_index]+'['+str(edge_type)+']', ShowResize(contour_image) )
+                    cv2.imshow( 'cluster by :'+ para[para_index], ShowResize(contour_image) )
                     cv2.waitKey(0)
                 if _writeImg[para[para_index]]:
-                    cv2.imwrite( output_path + fileName[:-4] +'_f_para['+para[para_index]+']_['+str(edge_type)+'].jpg', contour_image ) 
+                    cv2.imwrite( output_path + fileName[:-4] +'_f_para['+para[para_index]+'].jpg', contour_image ) 
                 
                 label_list_dic[para[para_index]] = label_list
                 
@@ -449,25 +443,14 @@ def main():
             # sort the group from the max area to min group and get max count
            
             if _showImg['original_result']:
-                cv2.imshow(fileName+' original_result['+str(edge_type)+']', ShowResize(contour_image) )
+                cv2.imshow(fileName+' original_result', ShowResize(contour_image) )
                 cv2.waitKey(0)     
             if _writeImg['original_result']:
-                cv2.imwrite( output_path + fileName[:-4] +'_g_original_result['+str(edge_type)+'].jpg', contour_image )            
+                cv2.imwrite( output_path + fileName[:-4] +'_g_original_result.jpg', contour_image )            
                 
             if len(final_group) < 1:
                 print 'No any pattern'
                 continue
-        
-            #====================================================================================
-            for f_edge_group in final_group:
-                final_differ_edge_group.append(f_edge_group)
-            
-            if not _use_structure_edge :
-                _use_structure_edge = True
-                continue
-            
-            final_group = final_differ_edge_group
-             #====================================================================================
              
             obvious_list = ['cover_area','color_gradient','shape_factor']
             #sort final cnt group by cover_area , shape_factor and color_gradient
